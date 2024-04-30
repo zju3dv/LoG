@@ -1,0 +1,41 @@
+max_steps: 600
+
+model:
+  module: LoG.model.level_of_gaussian.LoG
+  args:
+    use_view_correction: True
+    gaussian:
+      xyz_scale: $xyz_scale
+      sh_degree: 1
+      init_ply:
+        scale3d: $scale3d
+        filename: $PLYNAME
+        init_opacity: 0.1
+    optimizer:
+      optimize_keys: [xyz, colors, scaling, opacity, rotation, shs]
+      opt_all_levels: True # optimize all level or not
+      lr_dict:
+        xyz: 0.00016
+        xyz_final: 0.0000016
+        xyz_scale: $xyz_scale
+        colors: 0.0025
+        shs: 0.000125
+        scaling: 0.005
+        opacity: 0.05 # lr_opacity > lr_scaling
+        rotation: 0.001
+        max_steps: $max_steps # 30_000
+    tree:
+      max_child: 4
+      max_level: 30
+    densify_and_remove:
+      # add sh degree
+      upgrade_sh_iter: 10
+      densify_from_iter: 5
+      densify_every_iter: 1
+      # init
+      init_split_method: split_by_2d
+      init_pixel: 50
+      method: naive
+      min_steps: 100
+      split_grad_thres: 0.0001
+      remove_weights_thres: 0.005

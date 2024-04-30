@@ -1,0 +1,23 @@
+num_workers: &num_workers 4
+
+NAIVE_STAGE:
+  init:
+    loader:
+      module: iteration
+      args:
+        batch_size: 1
+        iterations: 250
+        num_workers: *num_workers
+    dataset_state:
+      scale: 8
+    model_state: {}
+  tree:
+    loader:
+      module: iteration
+      args:
+        batch_size: 1
+        iterations: 500
+        num_workers: *num_workers
+    dataset_state:
+      scale: 4
+    model_state: {}

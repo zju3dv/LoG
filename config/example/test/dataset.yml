@@ -1,0 +1,83 @@
+root: data/feicuiwan_sample_folder
+PLYNAME: data/feicuiwan_sample_folder/sparse/0/sparse.npz
+scale3d: 1.
+xyz_scale: 1.
+
+dataset:
+  module: LoG.dataset.colmap.ImageDataset
+  args:
+    root: $root
+    pre_undis: True
+    share_camera: False
+    scales: [1, 2, 4, 8]
+    crop_size: [-1, -1]
+    znear: 0.001
+    zfar: 100.
+    scale3d: $scale3d
+    ext: .JPG
+  
+val_dataset:
+  module: LoG.dataset.colmap.ImageDataset
+  args:
+    root: $root
+    namelist: 
+      - y/8y01073
+      - q/8q01283
+      - h/8h01559
+      - y/8y01763
+      - y/8y01755
+      - q/8q01543
+      - q/8q01330
+    cache: cache_val.pkl
+    pre_undis: True
+    share_camera: False
+    scales: [4]
+    znear: 0.001
+    zfar: 100.
+    scale3d: $scale3d
+    ext: .JPG
+
+demo_interpolate:
+  model_state:
+    enable_sh: True
+    log_query: False
+  dataset:
+    module: LoG.dataset.demo.InterpolatePath
+    args:
+      cameras: $PLYNAME
+      scale: 4
+      steps: 600
+      subs:
+        - y/8y01073
+        - q/8q01283
+        - h/8h01559
+        - y/8y01763
+        - y/8y01755
+        - q/8q01543
+        - q/8q01330
+        - y/8y01073
+
+demo_level:
+  model_state:
+    enable_sh: True
+    log_query: False
+  dataset:
+    module: LoG.dataset.demo.ShowLevel
+    args:
+      cameras: $PLYNAME
+      steps: 300
+      sub: y/8y01073
+      scale: 4
+
+demo_lod:
+  model_state:
+    enable_sh: True
+    log_query: False
+  dataset:
+    module: LoG.dataset.demo.ZoomInOut
+    args:
+      cameras: $PLYNAME
+      sub: y/8y01073
+      zranges: [-20., 1.]
+      scale: 2
+      use_logspace: False
