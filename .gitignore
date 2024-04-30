@@ -1,0 +1,15 @@
+data
+debug
+**.pyc
+**/__pycache__
+*.egg-info
+output
+cache
+imgui.ini
+*.ply
+*.hdr
+*.mp4
+images
+*.png
+*.out
+*.obj

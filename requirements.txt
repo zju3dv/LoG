@@ -1,0 +1,11 @@
+opencv-python
+plyfile==0.8.1
+tqdm
+ipdb
+PyYAML
+tensorboardX
+tensorboard
+six
+matplotlib
+trimesh
+lpips
