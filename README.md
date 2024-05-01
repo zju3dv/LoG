@@ -29,7 +29,7 @@ We employ [Colmap](https://colmap.github.io/) to prepare the dataset. Refer to t
 Training the model is as simple as one command:
 
 ```bash
-python3 apps/train.py --cfg config/example/test/train_log.yml split train
+python3 apps/train.py --cfg config/example/test/train.yml split train
 ```
 
 We automatically configure heuristic parameters based on the dataset size.
@@ -37,7 +37,7 @@ We automatically configure heuristic parameters based on the dataset size.
 We provide a path for interpolation visualization
 
 ```bash
-python3 apps/train.py --cfg config/example/test/train_log.yml split demo_interpolate ckptname output/example/test/level_of_gaussian/model_init.pth
+python3 apps/train.py --cfg config/example/test/train.yml split demo_interpolate ckptname output/example/test/level_of_gaussian/model_init.pth
 ```
 
 The visualization video will be stored at `output/example/test/level_of_gaussian/demo_interpolate/rgb.mp4`
