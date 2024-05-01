@@ -5,13 +5,13 @@ We provide a minimal example dataset [here](https://forms.gle/E3Roi9zriu6Sk4557)
 After downloading and extracting the dataset, place it in `data/feicuiwan_sample_folder`. You can verify its integrity by executing the following command:
 
 ```bash
-python3 apps/test_dataset.py --cfg config/example_feicui/dataset.yml split dataset
+python3 apps/test_dataset.py --cfg config/example/test/dataset.yml split dataset
 ```
 
 To ensure that the point cloud in the dataset is correctly projected, we utilize Gaussian Splatting with the following command:
 
 ```bash
-python3 apps/test_pointcloud.py --cfg config/example_feicui/dataset.yml split dataset radius 0.01
+python3 apps/test_pointcloud.py --cfg config/example/test/dataset.yml split dataset radius 0.01
 ```
 
 The output will be directed to the `debug/` directory.

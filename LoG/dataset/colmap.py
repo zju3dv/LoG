@@ -124,7 +124,7 @@ class ImageDataset(ImageBase):
                 cachedir = join(self.root, self.cache)
         self.cachedir = cachedir
         print(f'[{self.__class__.__name__}] cache dir: {self.cachedir}')
-        flag, infos = self.read_cache(name=self.cache)
+        flag, infos = self.read_cache(name=cachedir+'.pkl')
         if not flag:
             cameras = self.check_cameras(scale3d=scale3d, scale_camera_K=scale_camera_K)
             # undistort and scale
