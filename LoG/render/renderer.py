@@ -24,7 +24,7 @@ class BaseRender(torch.nn.Module):
     
     @staticmethod
     def make_video(path, remove_image=False, fps=30):
-        cmd = f'/usr/bin/ffmpeg -y -r {fps} -i {path}/%06d.jpg  -vf scale="2*ceil(iw/2):2*ceil(ih/2)" -vcodec libx264 -r {fps} {path}.mp4 -loglevel quiet'
+        cmd = f'ffmpeg -y -r {fps} -i {path}/%06d.jpg  -vf scale="2*ceil(iw/2):2*ceil(ih/2)" -vcodec libx264 -r {fps} {path}.mp4 -loglevel quiet'
         print(cmd)
         os.system(cmd)
 
@@ -79,11 +79,18 @@ class BaseRender(torch.nn.Module):
 
 class NaiveRendererAndLoss(BaseRender):
     def __init__(self, split='train', use_randback=False, background=[0., 0., 0.], 
-                 use_origin_render=False
+                 use_rand_radius=False,
+                 use_origin_render=False,
+                 render_depth=False,
                  ):
         super().__init__()
         self.split = split
         self.use_randback = use_randback
+        self.use_rand_radius = use_rand_radius
+        self.render_depth = render_depth
+        if render_depth:
+            from .loss import ScaleAndShiftInvariantLoss
+            self.depth_loss = ScaleAndShiftInvariantLoss()
         background = torch.tensor(background, dtype=torch.float32)
         self.register_buffer('background', background)
         self.l1_loss = nn.L1Loss()
@@ -97,9 +104,17 @@ class NaiveRendererAndLoss(BaseRender):
             from diff_gaussian_rasterization_wodilate import GaussianRasterizationSettings, GaussianRasterizer
             BaseRender.GaussianRasterizationSettings = GaussianRasterizationSettings
             BaseRender.GaussianRasterizer = GaussianRasterizer
+        self.use_origin_render = use_origin_render
 
-    def render(self, camera, rasterizer, model, features=None, extra_params={}, 
-            render_mask=False):
+    def set_state(self, render_depth=None, background=None):
+        if render_depth is not None:
+            self.render_depth = render_depth
+        if background is not None:
+            print(f'[{self.__class__.__name__}] Set background to {background}')
+            background = torch.tensor(background, dtype=torch.float32, device=self.background.device)
+            self.background = background
+
+    def render(self, camera, rasterizer, model, extra_params={}):
         ret = model.get_all(camera, rasterizer, **extra_params)
         if len(ret) == 0:
             device = camera['world_view_transform'].device
@@ -112,10 +127,7 @@ class NaiveRendererAndLoss(BaseRender):
             }
         xyz = ret['xyz']
         opacity = ret['opacity']
-        if render_mask:
-            colors = torch.ones_like(ret['xyz'])
-        else:
-            colors = ret['colors']
+        colors = ret['colors']
         scales = ret['scaling']
         rotations = ret['rotation']
         cov3D = None
@@ -126,16 +138,19 @@ class NaiveRendererAndLoss(BaseRender):
         except:
             pass
         model_data = ret
-        ret = rasterizer(
-            means3D = xyz,
-            means2D = screenspace_points,
-            shs = None,
-            colors_precomp = colors,
-            opacities = opacity,
-            scales = scales,
-            rotations = rotations,
-            cov3D_precomp = cov3D)
-        max_image = None
+        name_args = {
+            'means3D': xyz,
+            'means2D': screenspace_points,
+            'shs': None,
+            'colors_precomp': colors,
+            'opacities': opacity,
+            'scales': scales,
+            'rotations': rotations,
+            'cov3D_precomp': cov3D
+        }
+        if not self.use_origin_render and not model.training:
+            name_args['use_filter'] = False
+        ret = rasterizer(**name_args)
         if len(ret) == 5:
             rendered_image, radii, point_id_pixel, point_weight_pixel, point_weight = ret
             point_id, point_count = torch.unique(point_id_pixel, sorted=True, return_counts=True)
@@ -168,18 +183,28 @@ class NaiveRendererAndLoss(BaseRender):
             "opacity": opacity,
             "render_time": render_time
         }
+        if self.render_depth:
+            ones = torch.ones_like(point_depth)
+            height = xyz[:, 2]
+            colors_depth = torch.stack([point_depth, height, ones], dim=-1)
+            ret_depth = rasterizer(
+                means3D = xyz,
+                means2D = screenspace_points,
+                shs = None,
+                colors_precomp = colors_depth,
+                opacities = opacity,
+                scales = scales,
+                rotations = rotations,
+                cov3D_precomp = cov3D)
+            ret['depth'] = ret_depth[0][0]
+            ret['height'] = ret_depth[0][1]
+            ret['accmap'] = ret_depth[0][2]
         if point_weight_pixel is not None:
             ret["point_weight_pixel"] = point_weight_pixel.data
-        if rendered_image.shape[0] > 3:
-            ret['accmap'] = rendered_image[3:4]
-        if rendered_image.shape[0] > 4:
-            ret['depth'] = rendered_image[4:5]
         ret['render'] = rendered_image[:3]
-        if max_image is not None:
-            ret['render_max'] = max_image
         return ret, model_data
 
-    def prepare_camera(self, batch, bn, background):
+    def prepare_camera(self, batch, bn, background, is_train=False):
         camera = {}
         for key in ['camera_center', 'world_view_transform', 'full_proj_transform', 'image_width', 'image_height', 'FoVx', 'FoVy', 'K', 'R', 'T']:
             camera[key] = batch['camera'][key][bn]
@@ -190,29 +215,36 @@ class NaiveRendererAndLoss(BaseRender):
             if not torch.is_tensor(background):
                 background = torch.tensor(background).to(self.background.device)
         else:
-            if self.split == 'train' and self.use_randback:
+            if is_train and self.use_randback:
                 background = torch.rand_like(self.background)
             else:
                 background = self.background
         rasterizer = self.prepare(camera, background, scaling_modifier=1)
         return camera, rasterizer, background
 
-    def vis(self, batch, model, features=None, background=None, ret_mask=False):
+    def vis(self, batch, model, background=None):
         preds = defaultdict(list)
         for bn in range(batch['camera']['camera_center'].shape[0]):
-            camera, rasterizer, background = self.prepare_camera(batch, bn, background)
-            # radius2d_cuda = rasterizer.compute_radius(record['xyz'], record['scaling'], record['rotation'])
-            model.prepare(rasterizer)
-            render_pkg, model_data = self.render(camera, rasterizer, model, features=features)
+            camera, rasterizer, background = self.prepare_camera(batch, bn, background, is_train=model.training)
+            if model.training and self.use_rand_radius:
+                origin_radius = model.tree.min_resolution_pixel
+                random_log2 = torch.rand(1).item()
+                if random_log2 > 0.5:
+                    # random_log2: (0.5, 1) => (1, 5) => (2, 32)
+                    pixel_radius = 3 * 2 ** (random_log2 * 8 - 3)
+                else:
+                    # random_log2: (0, 0.5) => (0, 1) => (1, 2)
+                    pixel_radius = 3 * 2 ** (random_log2 * 2)
+                model.tree.min_resolution_pixel = pixel_radius
+            model.prepare(rasterizer, camera)
+            render_pkg, model_data = self.render(camera, rasterizer, model)
+            if model.training and self.use_rand_radius:
+                model.tree.min_resolution_pixel = origin_radius
             if getattr(model, 'view_correction', None) is not None and model.training:
                 view_correction = model.view_correction[batch['index'][bn].item()]
                 render_pkg['render_correct'] = render_pkg['render'] * view_correction[:, None, None]
             for key, val in render_pkg.items():
                 preds[key].append(val)
-            if ret_mask:
-                rasterizer = self.prepare(camera, torch.zeros_like(background), scaling_modifier=1)
-                render_msk, _ = self.render(camera, rasterizer, model, render_mask=True)
-                preds['mask'].append(render_msk['render'][0])
         for key in ['render', 'render_correct', 'render_max']:
             if key in preds.keys():
                 preds[key] = torch.stack(preds[key])
@@ -232,10 +264,33 @@ class NaiveRendererAndLoss(BaseRender):
             'ssim': ssim_loss.item()
         }
         output['loss'] = 0.2*ssim_loss + 0.8*l1_loss
-        if 'loss_max_weight' in output.keys():
-            output['loss_dict']['max_weight'] = output['loss_max_weight'][0].item()
-            output['loss'] += 0.1 * output['loss_max_weight'][0]
     
+    def append_depth_loss(self, gt_depth, pred_depth, output):
+        accmap = output['accmap'][0]
+        mask = accmap > 0.5
+        gt_depth = gt_depth[0]
+        pred_depth = pred_depth[0]
+        num_patch = 64
+        patch_size = 64
+        preds, gts, masks = [], [], []
+        start_rows = torch.randint(0, gt_depth.shape[0] - patch_size, size=(num_patch,), device=gt_depth.device)
+        start_cols = torch.randint(0, gt_depth.shape[1] - patch_size, size=(num_patch,), device=gt_depth.device)
+        for i in range(num_patch):
+            preds.append(pred_depth[start_rows[i]:start_rows[i]+patch_size, start_cols[i]:start_cols[i]+patch_size])
+            gts.append(gt_depth[start_rows[i]:start_rows[i]+patch_size, start_cols[i]:start_cols[i]+patch_size])
+            masks.append(mask[start_rows[i]:start_rows[i]+patch_size, start_cols[i]:start_cols[i]+patch_size])
+        preds = torch.stack(preds)
+        gts = torch.stack(gts)
+        masks = torch.stack(masks)
+        depth_loss, _ = self.depth_loss(1./(preds + 1e-5), gts, mask=masks)
+        output['gt_depth'] = gt_depth[None]
+        pred_depth_vis = 1./(pred_depth.detach() + 1e-5)
+        pred_depth_vis = (pred_depth_vis - pred_depth_vis[mask].min())/(pred_depth_vis[mask].max() - pred_depth_vis[mask].min())
+        output['pred_depth'] = pred_depth_vis[None]
+        output['loss_dict']['depth'] = depth_loss
+        output['loss'] += 1. * depth_loss
+        return output
+
     def process_gt(self, batch):
         return batch['image'].permute(0, 3, 1, 2)
 
@@ -255,6 +310,8 @@ class NaiveRendererAndLoss(BaseRender):
                     output['mask_ignore'] = mask_ignore
                 else:
                     self.calculate_loss(gt_image, render, output)
+                if self.render_depth:
+                    self.append_depth_loss(batch['depth'], output['depth'], output)
             output['gt'] = gt_image
         return output
 

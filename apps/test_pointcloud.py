@@ -37,14 +37,14 @@ if __name__ == '__main__':
         'rotation': rotation,
     }
     model = BaseGaussian.create_from_record(record)
-    renderer = NaiveRendererAndLoss(use_origin_render=True, background = [1., 1., 1.])
+    renderer = NaiveRendererAndLoss(use_origin_render=False, background = [1., 1., 1.])
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
     model.to(device)
     renderer.to(device)
     for i, batch in enumerate(tqdm(dataloader)):
         batch = prepare_batch(batch, device)
         with torch.no_grad():
-            output = renderer.vis(batch, model, ret_mask=True)
+            output = renderer.vis(batch, model)
         render = output['render'][0]
         vis = renderer.tensor_to_bgr(render)
         outname = f'debug/{i:06d}.jpg'

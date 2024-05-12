@@ -114,7 +114,7 @@ class BaseGaussian(nn.Module):
     def set_stage(self, stage):
         self.stage_name = stage
 
-    def get_all(self, camera, rasterizer):
+    def get_all(self, camera=None, rasterizer=None):
         return {
             'xyz': self.xyz,
             'colors': self.colors,
@@ -172,7 +172,8 @@ class BaseGaussian(nn.Module):
         rot[:, 0] = 1.
         return rot
 
-    def prepare(self, batch):
+    @torch.no_grad()
+    def prepare(self, rasterizer, camera):
         return 0
     
     def time_step(self):
