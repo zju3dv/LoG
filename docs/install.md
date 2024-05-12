@@ -58,3 +58,40 @@ cd ..
 # installs packages in editable mode
 pip install -e .
 ```
+
+
+## [MiDaS](https://github.com/isl-org/MiDaS)
+
+```bash
+git clone https://github.com/isl-org/MiDaS.git --depth=1
+cd MiDaS/weights
+wget -c https://github.com/isl-org/MiDaS/releases/download/v3_1/dpt_beit_large_512.pt
+cd ..
+cp ../../docs/external/run_midas.py ./
+# install extra packages
+pip install timm==0.6.12 imutils
+```
+
+### Interactive GUI Documentation
+
+We provide an interactive GUI that utilizes imgui and OpenGL for rendering. To operate this GUI, you must set up a desktop environment with a display on a Linux system. We have tested this setup on an Ubuntu system. Follow these steps to install the required dependencies:
+
+```bash
+cd submodules
+git clone https://github.com/zju3dv/EasyVolcap.git
+cd EasyVolcap
+pip install -v -e . --no-deps
+pip install pdbr h5py PyGLM imgui-bundle addict yapf ujson scikit-image cuda-python ruamel.yaml
+cd ..
+cd ..
+```
+
+To verify that the GUI is functioning correctly, execute the following command:
+
+```bash
+python3 apps/check_gui.py
+```
+
+The test script initializes a sequence of GS points randomly. You can interact with the GUI using the mouse to drag and rotate the viewpoint, scroll to zoom, and hold the right mouse button to pan the view. Keyboard controls using 'W', 'A', 'S', 'D' allow for camera movement. This setup provides a comprehensive way to explore and interact with the graphical content dynamically.
+
+https://github.com/chingswy/LoGvideos/assets/22812405/95c5c010-4e1f-4273-89bf-c96c3a990b06
