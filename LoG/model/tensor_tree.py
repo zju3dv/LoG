@@ -162,24 +162,24 @@ class TensorTree(nn.Module):
             indices_list = torch.cat(indices_list, dim=0)
         return indices_list
 
-    def traverse(self, model, root_index, rasterizer, max_depth=1000):
+    def traverse(self, model, root_index, camera, max_depth=1000):
         # compute_radius
-        radius3d, radius2d = model.compute_radius(root_index, rasterizer, level=0)
+        radius3d, radius2d = model.compute_radius(root_index, camera, level=0)
         if self.log_query:
             print(f'level {0:2d}: query {root_index.shape[0]} root, radius: [{radius2d.min():.1f}~{radius2d.mean():.1f}~{radius2d.max():.1f}]')
-        flag_root_has_child = self.node_index[root_index] != -1
-        flag_root_no_child = ~flag_root_has_child
+        flag_root_no_child = self.node_index[root_index] == -1
         flag_root_small = radius2d < self.min_resolution_pixel
-        flag_go_to_next = (~flag_root_small) & flag_root_has_child
-        flag_keep = ~flag_go_to_next
+        flag_keep = flag_root_small | flag_root_no_child
+        flag_go_to_next = ~flag_keep
         index_root_keep = root_index[flag_keep]
         index_root_next = root_index[flag_go_to_next]
         if self.log_query:
             print(f'        skip {index_root_keep.shape[0]}, next {index_root_next.shape[0]}')
         # select the index
-        index_child = self._query_tree_torch(model, index_root_next, rasterizer, 
+        index_child = self._query_tree_torch(model, index_root_next, camera, 
                             min_resolution_pixel=self.min_resolution_pixel, max_depth=max_depth)
-        index_concat = torch.cat([index_root_keep, index_child], dim=0)
+        index_list = [index_root_keep, index_child]
+        index_concat = torch.cat(index_list, dim=0)
         depth = self.depth[index_concat].float().mean()
         if self.log_query:
             print(f' query mean depth: {depth}')

@@ -22,7 +22,7 @@ class Counter(nn.Module):
         return self.grad_sum / torch.clamp(self.area_sum, min=1)
 
     def str_min_mean_max(self, name, data):
-        return f'{name:10s} {data.shape[0]:8d} [{data.min().item():.5f}~{data.float().mean().item():.5f}~{data.max().item():.5f}]'
+        return f'{name:10s} {data.shape[0]:8d} [{data.min().item():.5f}~{data.float().mean().item():.5f}+{data.float().std().item():.5f}~{data.max().item():.5f}]'
     
     def reset(self, num_points):
         print(f'[{self.__class__.__name__}] reset counter -> {num_points}')

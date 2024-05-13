@@ -32,7 +32,7 @@ model:
       upgrade_sh_iter: 10
       densify_from_iter: 1
       densify_every_iter: 1
-      upgrade_repeat: 50
+      upgrade_repeat: 5
       # init
       init_split_method: split_by_2d
       init_radius_min: 4
@@ -44,7 +44,7 @@ model:
       split_grad_thres: 0.0002
       radius2d_thres: 6
       remove_weights_thres: 0.005
-      max_split_points: 20000
+      max_split_points: 100000
       sort_method: radii
       min_steps_split: 100
       # 

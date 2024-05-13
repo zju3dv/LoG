@@ -43,7 +43,7 @@ def copy_files(src_dir, dst_dir):
     filenames = []
     ignore_rules = load_gitignore_rules(src_dir)
     for root, dirs, files in os.walk(src_dir, topdown=True):
-        dirs[:] = [d for d in dirs if d not in ['.git', 'debug', 'data', 'cache', 'output', 'extension']]
+        dirs[:] = [d for d in dirs if d not in ['.git', 'debug', 'data', 'cache', 'output', 'extension', 'submodules']]
         
         for name in files:
             file_path = os.path.join(root, name)

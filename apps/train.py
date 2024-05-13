@@ -21,16 +21,27 @@ def demo(cfg, model, device):
     model.eval()
     if 'model_state' in cfg[cfg.split]:
         model.set_state(**cfg[cfg.split]['model_state'])
+    if 'render_state' in cfg[cfg.split]:
+        renderer.set_state(**cfg[cfg.split]['render_state'])
     from LoG.utils.trainer import prepare_batch
     from tqdm import tqdm
     total_time = 0
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA device not available")
+    render_type = cfg.get('render_type', 'rgb')
+    if render_type == 'depth':
+        renderer.render_depth = True
+        depth_min = cfg.get('depth_min', 0.01)
+        depth_max = cfg.get('depth_max', 10.)
+    elif render_type == 'height':
+        renderer.render_depth = True
+        height_min = cfg.get('height_min', 0.01)
+        height_max = cfg.get('height_max', 10.)
 
     for batch_idx, batch in enumerate(tqdm(dataloader)):
         batch = prepare_batch(batch, device)
         with torch.no_grad():
-            output = renderer.vis(batch, model, ret_mask=True)
+            output = renderer.vis(batch, model)
         if batch_idx > 10:
             break
 
@@ -42,13 +53,23 @@ def demo(cfg, model, device):
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)
             start.record()
-            output = renderer.vis(batch, model, ret_mask=True)
+            output = renderer.vis(batch, model)
             end.record()
             end.synchronize()
             total_time += start.elapsed_time(end)
         render = output['render'][0]
-        vis = renderer.tensor_to_bgr(render)
-        outname = os.path.join(cfg.exp, cfg.split, 'rgb', f'{batch["index"].item():06d}.jpg')
+        if render_type == 'depth':
+            depth = output['depth'][0]
+            depth = (depth - depth_min)/(depth_max - depth_min)
+            vis = renderer.marigold_depth_vis(depth)
+        elif render_type == 'height':
+            depth = output['height'][0]
+            print(depth.min(), depth.max(), depth.mean())
+            depth = (depth - height_min)/(height_max - height_min)
+            vis = renderer.marigold_depth_vis(depth)        
+        else:
+            vis = renderer.tensor_to_bgr(render)
+        outname = os.path.join(cfg.exp, cfg.split, render_type, f'{batch["index"].item():06d}.jpg')
         os.makedirs(os.path.dirname(outname), exist_ok=True)
         cv2.imwrite(outname, vis)
         if 'mask' in output:
@@ -59,7 +80,7 @@ def demo(cfg, model, device):
             os.makedirs(os.path.dirname(rgbaname), exist_ok=True)
             cv2.imwrite(rgbaname, vis)
     print('Average time: {:.2f} ms, fps: {:.1f}'.format(total_time / len(dataloader), 1000 / (total_time / len(dataloader))))
-    renderer.make_video(os.path.dirname(outname))
+    renderer.make_video(os.path.dirname(outname), fps=cfg[cfg.split].get('fps', 30))
 
 def validate_for_metric(exp, dataset, model, renderer, device):
     renderer.to(device)
@@ -128,11 +149,16 @@ def main():
     if cfg.split == 'train':
         outdir = copy_git_tracked_files('./', exp)
         dataset = load_object(cfg.train.dataset.module, cfg.train.dataset.args)
-        # round 100 iteration
-        if len(dataset) < 1000:
-            model.base_iter = (len(dataset) // 100 + 1) * 100
+        if 'base_iter' in cfg:
+            base_iter = cfg.base_iter
         else:
-            model.base_iter = (len(dataset) // 1000 + 1) * 1000
+            # round 100 iteration
+            if len(dataset) < 1000:
+                base_iter = (len(dataset) // 100 + 1) * 100
+            else:
+                base_iter = (len(dataset) // 1000 + 1) * 1000
+        print('Base iteration: {}'.format(base_iter))
+        model.base_iter = base_iter
         renderer = load_object(cfg.train.render.module, cfg.train.render.args)
         trainer = Trainer(cfg, model, renderer, logdir=outdir)
         trainer.to(device)

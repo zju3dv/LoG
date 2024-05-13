@@ -24,7 +24,6 @@ val_dataset:
       - y/8y01073
       - q/8q01283
       - h/8h01559
-      - y/8y01763
       - y/8y01755
       - q/8q01543
       - q/8q01330
@@ -41,17 +40,18 @@ demo_interpolate:
   model_state:
     enable_sh: True
     log_query: False
+  render_state:
+    background: [1., 1., 1.]
   dataset:
     module: LoG.dataset.demo.InterpolatePath
     args:
       cameras: $PLYNAME
       scale: 4
-      steps: 600
+      steps: 300
       subs:
         - y/8y01073
         - q/8q01283
         - h/8h01559
-        - y/8y01763
         - y/8y01755
         - q/8q01543
         - q/8q01330
@@ -64,6 +64,19 @@ demo_level:
   dataset:
     module: LoG.dataset.demo.ShowLevel
     args:
+      cameras: $PLYNAME
+      steps: 10
+      sub: y/8y01073
+      scale: 4
+
+demo_pixel:
+  model_state:
+    enable_sh: True
+    log_query: True
+  dataset:
+    module: LoG.dataset.demo.ShowLevel
+    args:
+      mode: pixel
       cameras: $PLYNAME
       steps: 300
       sub: y/8y01073

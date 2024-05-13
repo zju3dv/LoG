@@ -152,10 +152,12 @@ class ZoomInOut(DemoBase):
         self.zfar = zfar
 
 class ShowLevel(DemoBase):
-    def __init__(self, cameras, sub, steps=300, scale=1, znear=0.01, zfar=100):
+    def __init__(self, cameras, sub, steps=300, scale=1, znear=0.01, zfar=100, mode='level'):
         super().__init__(znear, zfar)
         cameras = read_cameras(cameras)
         camera = cameras[sub]
+        self.pixel_max = 6
+        self.mode = mode
         infos = []
         for i in range(steps):
             R = camera['R']
@@ -178,8 +180,11 @@ class ShowLevel(DemoBase):
         ret = {
             'index': index,
             'camera': camera,
-            'model_state': {'current_depth': int((index + 1)/30)}
         }
+        if self.mode == 'pixel':
+            ret['model_state'] = {'min_resolution_pixel': 2**((1 - index/len(self))*self.pixel_max)}
+        else:
+            ret['model_state'] = {'current_depth': index}
         return ret
 
 class GivenKRCenter(DemoBase):
@@ -319,8 +324,9 @@ def interpolate_camera_path(c2ws: np.ndarray, steps=50, smoothing_term=10.0, **k
 
 class InterpolatePath(DemoBase):
     def __init__(self, cameras, subs=[], steps=300, znear=0.1, zfar=100., 
-        scale=1,
-        scale3d=1.) -> None:
+        scale=1, scale3d=1.,
+        H=-1, W=-1, ref_cam=None,
+        ) -> None:
         super().__init__(znear=znear, zfar=zfar)
         if os.path.isdir(cameras):
             cameras = read_cameras(cameras)
@@ -328,6 +334,8 @@ class InterpolatePath(DemoBase):
             cameras = read_cameras(os.path.dirname(cameras))
         Rlist = []
         Tlist = []
+        if len(subs) == 0:
+            subs = list(cameras.keys())
         for sub in subs:
             if isinstance(sub, str):
                 Rlist.append(cameras[sub]['R'])
@@ -347,7 +355,7 @@ class InterpolatePath(DemoBase):
                 if 'translation' in sub:
                     translation = np.array(sub['translation']).reshape(3, 1) / scale3d
                     center = center + translation
-                    print(center)
+                    print(center.T)
                     T = (-R @ center)[:, 0]
                 Rlist.append(R)
                 Tlist.append(T)
@@ -359,16 +367,19 @@ class InterpolatePath(DemoBase):
         elif True:
             Rlist = np.einsum('ijk->ikj', Rlist)
             RTlist = np.dstack([Rlist, centerlist])
-            RTlist = interpolate_camera_path(RTlist, steps=steps)
+            RTlist = interpolate_camera_path(RTlist, steps=steps, smoothing_term=5.)
             Rresample = RTlist[:, :3, :3].transpose(0, 2, 1)
             Tresample = RTlist[:, :3, 3:] 
         else:
             Rresample, Tresample = Rlist, cenerlist
         infos = []
-
-        K = cameras[list(cameras.keys())[0]]['K']
-        H = cameras[list(cameras.keys())[0]]['H']
-        W = cameras[list(cameras.keys())[0]]['W']
+        if ref_cam is None:
+            ref_cam = list(cameras.keys())[0]
+        K = cameras[ref_cam]['K']
+        if H == -1:
+            H = cameras[list(cameras.keys())[0]]['H']
+        if W == -1:
+            W = cameras[list(cameras.keys())[0]]['W']
         for i in range(Rresample.shape[0]):
             R = Rresample[i]
             center = Tresample[i].reshape(3, 1)

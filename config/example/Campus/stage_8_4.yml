@@ -6,7 +6,7 @@ NAIVE_STAGE:
       module: iteration
       args:
         batch_size: 1
-        iterations: 150
+        iterations: 100
         num_workers: *num_workers
     dataset_state:
       scale: 8
@@ -16,7 +16,7 @@ NAIVE_STAGE:
       module: iteration
       args:
         batch_size: 1
-        iterations: 550
+        iterations: 200
         num_workers: *num_workers
     dataset_state:
       scale: 4

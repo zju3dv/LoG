@@ -251,3 +251,23 @@ class ImageDataset(ImageBase):
             ret['mask_ignore'] = msk
         ret.update(data.get('extra', {}))
         return ret
+
+class DepthDataset(ImageDataset):
+    def __init__(self, depth_scale, depth_dir='depth', **kwargs):
+        super().__init__(**kwargs)
+        self.depth_scale = depth_scale
+        self.depth_dir = depth_dir
+    
+    def __getitem__(self, index):
+        ret = super().__getitem__(index)
+        depthname = ret['imgname'].replace(
+            self.image_dir, self.depth_dir)\
+            .replace(f'{os.sep}{self.current_scale}{os.sep}{self.depth_dir}', f'{os.sep}{self.depth_scale}{os.sep}{self.depth_dir}')\
+            + '.png'
+        if self.read_image:
+            # depth: (0.0 -> 1.0)
+            depth = self.read_depth(depthname)
+        else:
+            depth = depthname
+        ret['depth'] = depth
+        return ret

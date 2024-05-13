@@ -1,4 +1,4 @@
-# This file implement the LevelOfGaussian
+import math
 import torch
 import torch.nn as nn
 from .activation import Activation
@@ -8,6 +8,7 @@ from .counter import Counter
 from .splitter import Splitter
 from .tensor_tree import TensorTree
 from .model_utils import get_module_by_str
+from ..cuda.compute_radius import compute_radius_module
 from .corrector import Corrector
 
 MIN_PIXEL = 3
@@ -52,32 +53,45 @@ class Gaussian(nn.Module):
         return valid_flag, depth, p_proj
 
     def init_radius3d(self, batch, renderer):
-        camera, rasterizer, background = renderer.prepare_camera(batch, 0, renderer.background)
         scaling = self.activation.scaling_activation(self.scaling)
         rotation = self.activation.rotation_activation(self.rotation)
+        camera, rasterizer, background = renderer.prepare_camera(batch, 0, renderer.background)
         radius2d_cuda = rasterizer.compute_radius(self.xyz, scaling, rotation)
         valid_flag = radius2d_cuda > 0
         radius3d = scaling[:, 0]
         radius3d[valid_flag] = radius3d[valid_flag] * (3./radius2d_cuda[valid_flag])
         return valid_flag, radius3d
-    
-    def compute_radius(self, index, rasterizer, level=0):
+
+    @torch.no_grad()
+    def compute_radius(self, index, camera, level=0):
         xyz = self.xyz[index].detach()
         scaling = self.activation.scaling_activation(self.scaling[index].detach())
         rotation = self.activation.rotation_activation(self.rotation[index].detach())        
-        radius2d_cuda = rasterizer.compute_radius(xyz, scaling, rotation)
+        if False:
+            radius2d_cuda = compute_radius(xyz, scaling, rotation, camera)
+        else: # 18.20ms
+            proj_matrix = camera.raster_settings.projmatrix
+            view_matrix = camera.raster_settings.viewmatrix
+            tanfovx = camera.raster_settings.tanfovx
+            tanfovy = camera.raster_settings.tanfovy
+            image_width = camera.raster_settings.image_width
+            image_height = camera.raster_settings.image_height
+            focal_x = image_width / (2.0 * tanfovx)
+            focal_y = image_height / (2.0 * tanfovy)
+            radius2d_cuda = compute_radius_module.compute_radius(
+                xyz, scaling, rotation, 
+                proj_matrix, view_matrix,
+                focal_x, focal_y, tanfovx, tanfovy)
+        # else:
+        #     radius2d_cuda = camera.compute_radius(xyz, scaling, rotation)
         scaling3d = scaling.max(dim=-1).values
         return scaling3d, radius2d_cuda
 
     @torch.no_grad()
-    def prepare(self, rasterizer):
+    def prepare(self, rasterizer, camera):
         # 可以检查可见的node
         xyz = self.xyz.detach()
-        scaling = self.activation.scaling_activation(self.scaling.detach())
-        rotation = self.activation.rotation_activation(self.rotation.detach())
-        radius2d_cuda = rasterizer.compute_radius(xyz, scaling, rotation)
-        valid_flag = radius2d_cuda >= MIN_PIXEL # pixel
-        # valid_flag, depth, p_proj = self._visible_flag_by_camera(self.xyz.detach(), camera, squeeze=False, padding=0.5)
+        valid_flag, depth, p_proj = self._visible_flag_by_camera(xyz, camera, padding=0.5)
         self.visibility_flag = {
             'flag': valid_flag, 
             'index': torch.where(valid_flag)[0]
@@ -206,28 +220,26 @@ class LoG(nn.Module):
         rendered_image, radii, point_id_pixel, point_weight_pixel, point_weight = ret
         return point_weight
         
-    def prepare(self, rasterizer):
+    def prepare(self, rasterizer, camera):
         if self.tree.num_nodes == 0:
-            self.gaussian.prepare(rasterizer)
+            self.gaussian.prepare(rasterizer, camera)
         else:
             root_index = self.tree.root_index.long()
             xyz = self.gaussian.xyz[root_index].detach()
-            scaling = self.gaussian.activation.scaling_activation(self.gaussian.scaling[root_index].detach())
-            rotation = self.gaussian.activation.rotation_activation(self.gaussian.rotation[root_index].detach())
-            radius2d_cuda = rasterizer.compute_radius(xyz, scaling, rotation)
+            valid_root_flag, depth, p_proj = self.gaussian._visible_flag_by_camera(xyz, camera, padding=0.5)
             # check the visiblity
-            flag_large = radius2d_cuda > MIN_PIXEL # pixel
-            root_index_in_range = root_index[flag_large]
+            root_index_in_range = root_index[valid_root_flag]
             # render and check the weight
             opacity = self.gaussian.activation.opacity_activation(self.gaussian.opacity)
             use_visibility_check = True
             if use_visibility_check:
+                scaling = self.gaussian.activation.scaling_activation(self.gaussian.scaling)
+                rotation = self.gaussian.activation.rotation_activation(self.gaussian.rotation)
                 point_weight = self.render_to_check(rasterizer,
                     xyz[root_index_in_range], scaling[root_index_in_range],
                     rotation[root_index_in_range], opacity[root_index_in_range])
-                flag_large[flag_large.clone()] = point_weight > 1e-4
-            root_index = root_index[flag_large]
-            root_flag = flag_large
+                valid_root_flag[valid_root_flag.clone()] = point_weight > 1e-8
+            root_index = root_index[valid_root_flag]
             index_all = self.tree.traverse(self.gaussian, root_index, rasterizer, max_depth=self.current_depth)
             if self.optimizer_cfg.opt_all_levels:
                 # optimize the leaf nodes in all levels
@@ -238,7 +250,7 @@ class LoG(nn.Module):
             index_leaf = index_all[flag_isleaf]
             index_node = index_all[~flag_isleaf]
             self.gaussian.visibility_flag = {
-                'root_flag': root_flag, 
+                'root_flag': valid_root_flag, 
                 'index': index_leaf,
                 'index_node': index_node
             }
@@ -380,33 +392,40 @@ class LoG(nn.Module):
         index = index[flag_vis]
         self.clamp_scale(index)
         self.lr = self.optimizer.xyz_lr
+        if self.optimizer.global_steps == self.base_iter:
+            print(f'[{self.__class__.__name__}] base iteration {self.base_iter} done, enable view_correction module')
         if self.use_view_correction and self.optimizer.global_steps > self.base_iter:
             self.view_correction.step()
 
-    def check_remove_flag(self, counter, iteration, min_steps=500):
-        import ipdb;ipdb.set_trace()
-
-    def update_init_stage(self):
-        flag_remove = self.counter.radii_max_max < MIN_PIXEL \
-            | (self.counter.weights_max < 0.01) #) & (self.counter.visible_count >= 2)
-        # check area sum
+    def update_init_stage(self, scale=1):
+        flag_remove_weight = self.counter.weights_max < self.densify_and_remove.init_weight_min
+        opacity = self.gaussian.activation.opacity_activation(self.gaussian.opacity[:, 0].detach())
+        flag_nonmax = self.counter.weights_max < opacity * 0.1
+        flag_remove_small = self.counter.radii_max_max < (self.densify_and_remove.init_radius_min * scale) ** 2
+        print(f'[{self.__class__.__name__}] {flag_remove_weight.sum():10d} points with weight < {self.densify_and_remove.init_weight_min:.2f}')
+        print(f'[{self.__class__.__name__}] {flag_nonmax.sum():10d} points with weight is non max')
+        print(f'[{self.__class__.__name__}] {flag_remove_small.sum():10d} points with radius < {self.densify_and_remove.init_radius_min:.2f}')
+        flag_remove_small = flag_remove_small & (torch.rand_like(self.counter.weights_max) > 0.5)
+        flag_remove = flag_remove_small | flag_remove_weight | flag_nonmax
         radii_max = self.counter.radii_max_max.float()
-        print(f'[{self.__class__.__name__}] {self.counter.str_min_mean_max("radii_max", radii_max)}')
-        print(f'[{self.__class__.__name__}] {self.counter.str_min_mean_max("radii_max>0", radii_max[radii_max>0])}')
-        flag_activation = self.counter.create_steps > self.densify_and_remove.min_steps
-        radii_mean = radii_max[radii_max > 0].mean()
-        radii_std = radii_max[radii_max > 0].std()
+        flag_activation = (self.counter.create_steps > self.densify_and_remove.min_steps) & (radii_max > 0)
+        print(f'[{self.__class__.__name__}] {self.counter.str_min_mean_max("radii_max_act", radii_max[flag_activation])}')        
+        grad = self.counter.get_gradmean()
+        print(f'[{self.__class__.__name__}] {self.counter.str_min_mean_max("grad", grad)}')        
+        radii_mean = radii_max[flag_activation].mean()
+        radii_std = radii_max[flag_activation].std()
         mode = self.densify_and_remove.init_split_method
-        split_thres = self.densify_and_remove.init_pixel ** 2
+        split_thres = self.densify_and_remove.init_radius_split * scale
         if mode == 'split_by_2d':
-            area_sum = self.counter.area_sum.float()
-            area_sum_mean = area_sum[area_sum>0].mean()
-            area_sum_std = area_sum[area_sum>0].std()
             if split_thres == -1:
-                split_thres = area_sum_mean + 3 * area_sum_std
-            flag_split = area_sum > split_thres
-            print(f'[{self.__class__.__name__}] area_sum: {area_sum_mean:.2f}+{area_sum_std:.2f}')
+                split_thres = radii_mean + radii_std * 3
+            flag_split_grad = (grad > 10 * self.densify_and_remove.split_grad_thres) & (radii_max > self.densify_and_remove.init_radius_min * scale * 8)
+            flag_split_radii = radii_max > split_thres ** 2
+            print(f'[{self.__class__.__name__}] split by grad : {flag_split_grad.sum():8d}')
+            print(f'[{self.__class__.__name__}] split by radii: {flag_split_radii.sum():8d}')
+            flag_split = flag_split_radii | flag_split_grad
             flag_split = flag_activation & flag_split & (~flag_remove)
+            print(f'[{self.__class__.__name__}] {self.counter.str_min_mean_max("radii_split", radii_max[flag_split])}')
         elif mode == 'split_by_3d':
             radius = self.gaussian.activation.scaling_activation(self.gaussian.scaling.detach())
             radius_max = radius.max(dim=-1).values
@@ -441,36 +460,52 @@ class LoG(nn.Module):
         radius_mid = radius.sum(dim=-1) - radius_max - radius_min
         ratio = radius_max / radius_mid
         # 
-        flag_is_parent = self.tree.depth == self.current_depth - 1
-        depth_minus1_sum = (self.tree.depth == self.current_depth - 1).sum()
-        flag_depth_parent = (self.tree.depth == self.current_depth - 1) & (self.tree.node_index == -1)
-        flag_depth_child = self.tree.depth == self.current_depth
+        only_operate_last_layer = False
+        if only_operate_last_layer:
+            flag_is_parent = self.tree.depth == self.current_depth - 1
+            depth_minus1_sum = (self.tree.depth == self.current_depth - 1).sum()
+            flag_depth_parent = (self.tree.depth == self.current_depth - 1) & (self.tree.node_index == -1)
+            flag_depth_child = self.tree.depth == self.current_depth
+        else:
+            flag_is_parent = (self.tree.node_index == -1) & (self.tree.depth < self.current_depth)
+            flag_depth_parent = flag_is_parent & (self.counter.create_steps > self.densify_and_remove.min_steps_split)
+            depth_minus1_sum = (self.tree.depth < self.current_depth).sum()
+            flag_depth_child = (self.tree.node_index == -1) & (self.tree.depth > 0)
         grad = self.counter.get_gradmean()
         radii_max_max = self.counter.radii_max_max.float()
         print(f'{log_prefix} {self.counter.str_min_mean_max("opacity", opacity[flag_is_parent])}')
         print(f'{log_prefix} {self.counter.str_min_mean_max("ratio", ratio[flag_is_parent])}')
         print(f'{log_prefix} {self.counter.str_min_mean_max("grad", grad[flag_is_parent])}')
         print(f'{log_prefix} {self.counter.str_min_mean_max("radii", radii_max_max[flag_is_parent])}')
-        grad_thres = 2e-4
-        radius2d_thres = MIN_PIXEL * 2
-        if flag_depth_child.sum() == 0:
-            flag_split_grad = grad > grad_thres
-            flag_split_radii = self.counter.radii_max_max > radius2d_thres
-            flag_split = flag_split_grad & flag_split_radii & flag_depth_parent
+        grad_thres = self.densify_and_remove.split_grad_thres
+        radius2d_thres = self.densify_and_remove.radius2d_thres
+        flag_split_grad = grad > grad_thres
+        flag_split_radii = self.counter.radii_max_max > radius2d_thres
+        print(f'{log_prefix} split by grad: {flag_split_grad.sum():8d} split by radii: {flag_split_radii.sum():8d}')
+        flag_split = flag_split_grad & flag_split_radii & flag_depth_parent
+        if flag_depth_child.sum() == 0: # not any children
             flag_remove = torch.zeros_like(flag_split)
         else:
-            flag_split_grad = grad > grad_thres
-            flag_split_radii = self.counter.radii_max_max > radius2d_thres
             weights_max = self.counter.weights_max
-            flag_split = flag_split_grad & flag_split_radii & flag_depth_parent
-            flag_remove = flag_depth_child & (weights_max < 0.005)
-            # TODO:remove the children that larger than its parent
-        num_max_split = int(depth_minus1_sum * 0.05)
+            flag_remove = flag_depth_child & (weights_max < self.densify_and_remove.remove_weights_thres) & (self.counter.visible_count > 1)
+        flag_split = flag_split & (~flag_remove)
+        num_max_split = min(int(depth_minus1_sum * 0.05), self.densify_and_remove.max_split_points)
+        sort_method = self.densify_and_remove.sort_method
         if flag_split.sum() > num_max_split:
-            radii_max_max_depth = radii_max_max[flag_split]
-            new_radii_thres = torch.topk(radii_max_max_depth, num_max_split, largest=True).values[-1]
-            print(f'{log_prefix} select top 5% points to split. New radii thres = {new_radii_thres:.1f}')
-            flag_split = flag_split & (radii_max_max > new_radii_thres)
+            if sort_method == 'radii':
+                radii_max_max_depth = radii_max_max[flag_split]
+                new_radii_thres = torch.topk(radii_max_max_depth, num_max_split, largest=True).values[-1]
+                print(f'{log_prefix} select top {num_max_split} points to split. New radii thres = {new_radii_thres:.1f}')
+                flag_split = flag_split & (radii_max_max >= new_radii_thres)
+            elif sort_method == 'opacity':
+                opacity = self.gaussian.activation.opacity_activation(self.gaussian.opacity[:, 0].detach())
+                new_opacity_thres = torch.topk(opacity[flag_split], num_max_split, largest=True).values[-1]
+                print(f'{log_prefix} select top {num_max_split} points to split. New opacity thres = {new_opacity_thres:.3f}')
+                flag_split = flag_split & (opacity >= new_opacity_thres)
+            elif sort_method == 'grad':
+                new_grad_thres = torch.topk(grad[flag_split], num_max_split, largest=True).values[-1]
+                print(f'{log_prefix} select top {num_max_split} points to split. New grad thres = {new_grad_thres:.3f}')
+                flag_split = flag_split & (grad >= new_opacity_thres)
         flag_split, flag_remove = self.tree.split_and_remove(flag_split, flag_remove)
         self.splitter.split_and_remove(self.gaussian, self.optimizer, 
             flag_split, flag_remove, remove_split=False)
@@ -479,7 +514,9 @@ class LoG(nn.Module):
             flag_split, flag_remove, remove_split=False)
         # set the radius3d_max to the parent scales
         num_split = flag_split.sum() * self.splitter.N
-        self.counter.radius3d_max[-num_split:] = radius_max[flag_split][:, None].repeat(1, self.splitter.N).reshape(-1)
+        scaling_decay = self.densify_and_remove.scaling_decay
+        if num_split > 0:
+            self.counter.radius3d_max[-num_split:] = scaling_decay * radius_max[flag_split][:, None].repeat(1, self.splitter.N).reshape(-1)
         self.counter.reset(self.num_points)
         for depth in range(self.current_depth + 1):
             flag_depth = self.tree.depth == depth
@@ -490,7 +527,8 @@ class LoG(nn.Module):
     def upgrade_tree(self):
         if self.current_depth == 0:
             self.tree.initialize(self.gaussian.xyz)
-        self.current_depth += 1
+        # self.current_depth += 1
+        self.current_depth = 20
         print(f'[{self.__class__.__name__}] current depth: {self.current_depth}')
         self.counter.reset(self.num_points)
 
@@ -505,7 +543,10 @@ class LoG(nn.Module):
         sum_iter = int((self.current_depth + 1)*(self.current_depth+2)/2)
         upgrade_tree_iter = densify_every_iter * sum_iter * 20
         sum_iter = (self.current_depth + 1)
-        upgrade_tree_iter = densify_every_iter * sum_iter * 50
+        upgrade_tree_iter = densify_every_iter * sum_iter * self.densify_and_remove.upgrade_repeat
+        if (iteration + 1) == densify_from_iter:
+            self.counter.reset(self.num_points)
+            return False
         if (iteration + 1 > densify_from_iter) and (iteration + 1) % densify_every_iter == 0:
             if (iteration + 1) % upgrade_tree_iter == 0 and self.stage_name != 'init':
                 self.upgrade_tree()
@@ -513,6 +554,8 @@ class LoG(nn.Module):
             if self.current_depth == 0:
                 if self.stage_name == 'init':
                     self.update_init_stage()
+                else:
+                    self.update_init_stage(scale=2)
             else:
                 if (iteration + 1) % (2*densify_every_iter) == 0:
                     self.update_depth_stage(global_iteration)

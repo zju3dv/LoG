@@ -19,20 +19,21 @@ class SSIM(nn.Module):
         super().__init__()
         self.channel = channel
         self.window_size = window_size
+        self.padding = 0
         window = self.create_window(window_size, channel=channel)
         self.register_buffer('window', window)
     
     def forward(self, img1, img2, reduce=True):
         window = self.window
-        mu1 = F.conv2d(img1, window, padding=self.window_size // 2, groups=self.channel)
-        mu2 = F.conv2d(img2, window, padding=self.window_size // 2, groups=self.channel)
+        mu1 = F.conv2d(img1, window, padding=self.padding, groups=self.channel)
+        mu2 = F.conv2d(img2, window, padding=self.padding, groups=self.channel)
 
         mu1_sq = mu1.pow(2)
         mu2_sq = mu2.pow(2)
         mu1_mu2 = mu1 * mu2
-        sigma1_sq = F.conv2d(img1 * img1, window, padding=self.window_size // 2, groups=self.channel) - mu1_sq
-        sigma2_sq = F.conv2d(img2 * img2, window, padding=self.window_size // 2, groups=self.channel) - mu2_sq
-        sigma12 = F.conv2d(img1 * img2, window, padding=self.window_size // 2, groups=self.channel) - mu1_mu2
+        sigma1_sq = F.conv2d(img1 * img1, window, padding=self.padding, groups=self.channel) - mu1_sq
+        sigma2_sq = F.conv2d(img2 * img2, window, padding=self.padding, groups=self.channel) - mu2_sq
+        sigma12 = F.conv2d(img1 * img2, window, padding=self.padding, groups=self.channel) - mu1_mu2
 
         C1 = 0.01 ** 2
         C2 = 0.03 ** 2

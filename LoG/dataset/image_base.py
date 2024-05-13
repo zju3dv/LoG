@@ -10,7 +10,7 @@ class ImageBase:
         if namelist is not None:
             if isinstance(namelist, str):
                 if os.path.exists(namelist):
-                    with open(self.namelist, 'r') as f:
+                    with open(namelist, 'r') as f:
                         namelist = f.readlines()
         self.namelist = namelist            
         self.ignorelist = ignorelist
@@ -57,7 +57,7 @@ class ImageBase:
 
     @staticmethod
     def make_video(path, remove_image=False, fps=30):
-        cmd = f'/usr/bin/ffmpeg -y -r {fps} -i {path}/%06d.jpg  -vf scale="2*ceil(iw/2):2*ceil(ih/2)" -vcodec libx264 -r {fps} {path}.mp4 -loglevel quiet'
+        cmd = f'ffmpeg -y -r {fps} -i {path}/%06d.jpg  -vf scale="2*ceil(iw/2):2*ceil(ih/2)" -vcodec libx264 -r {fps} {path}.mp4 -loglevel quiet'
         print(cmd)
         os.system(cmd)
 
@@ -72,8 +72,11 @@ class ImageBase:
                 cameras_new[name] = cameras[name]
             cameras = cameras_new
         if self.ignorelist is not None:
-            with open(self.ignorelist, 'r') as f:
-                ignorelist = f.readlines()
+            if isinstance(self.ignorelist, str):
+                with open(self.ignorelist, 'r') as f:
+                    ignorelist = f.readlines()
+            elif isinstance(self.ignorelist, list):
+                ignorelist = self.ignorelist
             for name in ignorelist:
                 name = name.strip()
                 cameras.pop(name)

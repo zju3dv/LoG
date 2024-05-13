@@ -94,4 +94,15 @@ python3 apps/check_gui.py
 
 The test script initializes a sequence of GS points randomly. You can interact with the GUI using the mouse to drag and rotate the viewpoint, scroll to zoom, and hold the right mouse button to pan the view. Keyboard controls using 'W', 'A', 'S', 'D' allow for camera movement. This setup provides a comprehensive way to explore and interact with the graphical content dynamically.
 
+To visualize the trained model, you should specify the path of model config and the model checkpoints:
+
+```bash
+python3 apps/gui.py filename=<config_name> ckptname=<checkpoint_name>
+# for example:
+python3 apps/gui.py filename=config/example/test/train.yml ckptname=output/example/test/log/model_init_wotrain.pth
+# 
+python3 apps/gui.py filename=config/example/test/train.yml ckptname=output/example/test/log/model_latest_wotrain.pth
+```
+
 https://github.com/chingswy/LoGvideos/assets/22812405/95c5c010-4e1f-4273-89bf-c96c3a990b06
+

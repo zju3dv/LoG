@@ -4,7 +4,7 @@ import torch.nn as nn
 from .sparse_optimizer import SparseOptimizer, _single_tensor_adam
 
 class Corrector(nn.Module):
-    def __init__(self, use_view_correction, start_step=1000, lr_init=0.1, lr_final=0.001):
+    def __init__(self, use_view_correction, start_step=0, lr_init=0.1, lr_final=0.001):
         super().__init__()
         self.lr_init = lr_init
         self.lr_final = lr_final

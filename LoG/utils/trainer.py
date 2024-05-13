@@ -29,6 +29,8 @@ def prepare_batch(data, device):
             batch[key] = torch.FloatTensor(val).to(device)
         elif key == 'camera' or key == 'camera_depth':
             for camk in val.keys():
+                if camk in ['image_width', 'image_height', 'FoVy', 'FoVx', 'znear', 'zfar']:
+                    continue
                 if isinstance(val[camk], np.ndarray):
                     val[camk] = torch.FloatTensor(val[camk]).to(device)
                 elif torch.is_tensor(val[camk]):
@@ -167,7 +169,7 @@ class Trainer(nn.Module):
         os.makedirs(join(self.exp, 'init'), exist_ok=True)
         if 'init' in self.cfg.train:
             dataset.set_state(**self.cfg.train.init.dataset_state)
-            valloader = self.val_loader(dataset, num_workers=0)
+            valloader = self.val_loader(dataset, num_workers=8)
             self.model.at_init_start()
             for iteration, data in enumerate(tqdm(valloader, desc='initialize the model')):
                 # timer the process
@@ -253,10 +255,16 @@ class Trainer(nn.Module):
         print(f'[{self.global_iterations:6d}: {batch_idx:6d}/{batch_total:6d}] {current_time:4.1f}s loss: {loss:.4f} model {self.model}')
         self.start_time = time.time()
         vis_list = []
-        for key in ['gt', 'render', 'render_correct', 'render_max', 'render_id', 'render_root', 'render_leaf']:
+        for key in ['gt', 'render', \
+                    'gt_depth', 'pred_depth', \
+                    'render_correct', 'render_max', 'render_id', 'render_root', 'render_leaf']:
             if key in output.keys():
                 vis_tensor = output[key][0].detach()
-                vis_numpy = self.render.tensor_to_bgr(vis_tensor)
+                if key == 'pred_depth' or key == 'gt_depth':
+                    # vis_tensor = (vis_tensor - vis_tensor.min())/(vis_tensor.max() - vis_tensor.min())
+                    vis_numpy = self.render.marigold_depth_vis(vis_tensor)
+                else:
+                    vis_numpy = self.render.tensor_to_bgr(vis_tensor)
                 cv2.putText(vis_numpy, f'{key}', (10, vis_numpy.shape[0]-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
                 vis_list.append(vis_numpy)
         vis = np.hstack(vis_list)
@@ -272,19 +280,6 @@ class Trainer(nn.Module):
             vis_residual = self.render.marigold_depth_vis(residual)
             outname = os.path.join(self.exp, 'residual', '{:06d}.jpg'.format(self.global_iterations))
             imwrite(outname, vis_residual)
-        # vis depth
-        if 'gt_depth' in output.keys():
-            depth = torch.cat([output['gt_depth'][0], output['depth_ssi_map'][0].detach()], dim=0)
-            vis_depth = self.render.marigold_depth_vis(depth)
-            outname = os.path.join(self.exp, 'depth', '{:06d}.jpg'.format(self.global_iterations))
-            imwrite(outname, vis_depth)
-            # write the height map
-            if 'height_map' in output:
-                vis_height = output['height_map'][0].detach().cpu()
-                vis_height = (vis_height - vis_height.min()) / (vis_height.max() - vis_height.min())
-                vis_height = self.render.marigold_depth_vis(vis_height)
-                outname = os.path.join(self.exp, 'height', '{:06d}.jpg'.format(self.global_iterations))
-                imwrite(outname, vis_height)
         if 'acc_map' in output.keys():
             acc = output['acc_map'][0]
             vis_acc = self.render.marigold_depth_vis(acc)
@@ -310,11 +305,16 @@ class Trainer(nn.Module):
         for _data in tqdm(self.val, desc=f'val {iteration}'):
             batch = prepare_batch(_data, self.device)
             model.clear()
-            output = self.render_val.vis(batch, self.model)
+            output = self.render_val.vis(batch, self.model, background=torch.ones_like(self.render_val.background))
             pred = output['render'][0].detach()
             pred = self.render_val.process_pred(batch, pred)
             gt = self.render_val.process_gt(batch)[0]
             del output
+            if getattr(model, 'view_correction', None) is not None:
+                gt_left = gt[:, :, :gt.shape[2]//2]
+                pred_left = pred[:, :, :pred.shape[2]//2]
+                view_correct = (gt_left * pred_left).sum(dim=-1).sum(dim=-1) / (pred_left ** 2).sum(dim=-1).sum(dim=-1)
+                pred = torch.clamp(pred * view_correct[:, None, None], 0., 1.)
             # calculate the metrics
             l1 = torch.mean(torch.abs(pred - gt))
             _psnr = psnr(pred, gt)
@@ -474,6 +474,8 @@ class Trainer(nn.Module):
             dataset.set_state(**stage.dataset_state)
             self.model.set_stage(stage_name)
             self.model.set_state(**stage.model_state)
+            if 'render_state' in stage.keys():
+                self.render.set_state(**stage.render_state)
             trainloader = self.train_loader(dataset, stage.loader.args, base_iter=self.model.base_iter)
             self.recorder.log(self.global_iterations, 'train/batch_size', stage.loader.args.batch_size)
             self.model.training_setup()
@@ -482,7 +484,6 @@ class Trainer(nn.Module):
             self.start_time = time.time()
             need_log = True
             moving_mean_loss = 0
-            print(self.model)
             for iteration, data in enumerate(trainloader):
                 self.model.clear()
                 self.render.iteration = self.global_iterations
