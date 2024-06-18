@@ -1,0 +1,34 @@
+2024-06-13 07:58:28,957 INFO    MainThread:748815 [wandb_setup.py:_flush():76] Current SDK version is 0.17.1
+2024-06-13 07:58:28,957 INFO    MainThread:748815 [wandb_setup.py:_flush():76] Configure stats pid to 748815
+2024-06-13 07:58:28,957 INFO    MainThread:748815 [wandb_setup.py:_flush():76] Loading settings from /root/.config/wandb/settings
+2024-06-13 07:58:28,957 INFO    MainThread:748815 [wandb_setup.py:_flush():76] Loading settings from /root/repository/project/sci/log/LoG/wandb/settings
+2024-06-13 07:58:28,957 INFO    MainThread:748815 [wandb_setup.py:_flush():76] Loading settings from environment variables: {}
+2024-06-13 07:58:28,957 INFO    MainThread:748815 [wandb_setup.py:_flush():76] Applying setup settings: {'_disable_service': False}
+2024-06-13 07:58:28,957 INFO    MainThread:748815 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program_relpath': 'apps/train.py', 'program_abspath': '/root/repository/project/sci/log/LoG/apps/train.py', 'program': '/root/repository/project/sci/log/LoG/apps/train.py'}
+2024-06-13 07:58:28,957 INFO    MainThread:748815 [wandb_setup.py:_flush():76] Applying login settings: {}
+2024-06-13 07:58:28,957 INFO    MainThread:748815 [wandb_init.py:_log_setup():520] Logging user logs to /root/repository/project/sci/log/LoG/wandb/run-20240613_075828-zzd84trq/logs/debug.log
+2024-06-13 07:58:28,957 INFO    MainThread:748815 [wandb_init.py:_log_setup():521] Logging internal logs to /root/repository/project/sci/log/LoG/wandb/run-20240613_075828-zzd84trq/logs/debug-internal.log
+2024-06-13 07:58:28,957 INFO    MainThread:748815 [wandb_init.py:init():560] calling init triggers
+2024-06-13 07:58:28,957 INFO    MainThread:748815 [wandb_init.py:init():567] wandb.init called with sweep_config: {}
+config: {'learning_rate': 0, 'architecture': 'log', 'dataset': 'Lihu-domi_lowres', 'epochs': 0}
+2024-06-13 07:58:28,957 INFO    MainThread:748815 [wandb_init.py:init():610] starting backend
+2024-06-13 07:58:28,957 INFO    MainThread:748815 [wandb_init.py:init():614] setting up manager
+2024-06-13 07:58:28,958 INFO    MainThread:748815 [backend.py:_multiprocessing_setup():105] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2024-06-13 07:58:28,959 INFO    MainThread:748815 [wandb_init.py:init():622] backend started and connected
+2024-06-13 07:58:28,960 INFO    MainThread:748815 [wandb_init.py:init():711] updated telemetry
+2024-06-13 07:58:28,965 INFO    MainThread:748815 [wandb_init.py:init():744] communicating run to backend with 90.0 second timeout
+2024-06-13 07:58:29,801 INFO    MainThread:748815 [wandb_run.py:_on_init():2402] communicating current version
+2024-06-13 07:58:30,156 INFO    MainThread:748815 [wandb_run.py:_on_init():2411] got version response 
+2024-06-13 07:58:30,156 INFO    MainThread:748815 [wandb_init.py:init():795] starting run threads in backend
+2024-06-13 07:58:34,744 INFO    MainThread:748815 [wandb_run.py:_console_start():2380] atexit reg
+2024-06-13 07:58:34,745 INFO    MainThread:748815 [wandb_run.py:_redirect():2235] redirect: wrap_raw
+2024-06-13 07:58:34,745 INFO    MainThread:748815 [wandb_run.py:_redirect():2300] Wrapping output streams.
+2024-06-13 07:58:34,745 INFO    MainThread:748815 [wandb_run.py:_redirect():2325] Redirects installed.
+2024-06-13 07:58:34,746 INFO    MainThread:748815 [wandb_init.py:init():838] run started, returning control to user process
+2024-06-13 10:19:03,635 INFO    MainThread:748815 [wandb_run.py:_finish():2109] finishing run lysvcc/my-awesome-project/zzd84trq
+2024-06-13 10:19:03,635 INFO    MainThread:748815 [wandb_run.py:_atexit_cleanup():2349] got exitcode: 0
+2024-06-13 10:19:03,635 INFO    MainThread:748815 [wandb_run.py:_restore():2332] restore
+2024-06-13 10:19:03,635 INFO    MainThread:748815 [wandb_run.py:_restore():2338] restore done
+2024-06-13 10:19:33,932 INFO    MainThread:748815 [wandb_run.py:_footer_history_summary_info():4008] rendering history
+2024-06-13 10:19:33,933 INFO    MainThread:748815 [wandb_run.py:_footer_history_summary_info():4040] rendering summary
+2024-06-13 10:19:33,939 INFO    MainThread:748815 [wandb_run.py:_footer_sync_info():3967] logging synced files

@@ -1,0 +1,34 @@
+parents:
+  - config/Yingrenshi_add_path/dataset.yml
+  - config/Yingrenshi_add_path/level_of_gaussian.yml
+  - config/Yingrenshi_add_path/stage_8_4.yml
+
+exp: output/Yingrenshi_add_path/log
+gpus: [0]
+
+log_interval: 1000
+save_interval: 50_000
+
+max_steps: 750
+
+RGB_RENDER_L1_SSIM:
+  module: LoG.render.renderer.NaiveRendererAndLoss
+  args:
+    use_origin_render: False
+    use_randback: True
+
+# val:
+#   iteration: 1
+
+train:
+  dataset: $dataset
+  render: $RGB_RENDER_L1_SSIM
+  stages: $NAIVE_STAGE
+  init:
+    method: scale_min
+    dataset_state:
+      scale: 4
+
+# val:
+#   # dataset: $val_dataset
+#   iteration: 1

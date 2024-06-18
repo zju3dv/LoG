@@ -6,6 +6,7 @@ from LoG.utils.config import load_object, Config
 from LoG.utils.command import update_global_variable, load_statedict, copy_git_tracked_files
 import cv2
 import torch
+import wandb
 
 def demo(cfg, model, device):
     dataset = load_object(cfg[cfg.split].dataset.module, cfg[cfg.split].dataset.args)
@@ -128,13 +129,27 @@ def validate_for_metric(exp, dataset, model, renderer, device):
         print('scale: {}, Average time: {:.2f} ms, fps: {:.1f}'.format(scale, total_time / len(dataloader), 1000 / (total_time / len(dataloader))))
 
 def main():
+    #wandb
+    # wandb.init(
+    # # set the wandb project where this run will be logged
+    #     project="my-awesome-project",
+
+    #     # track hyperparameters and run metadata
+    #     config={
+    #         "learning_rate": 0,
+    #         "architecture": "log",
+    #         "dataset": "Lihu-domi_lowres",
+    #         "epochs": 0,
+    #     }
+    # )
     usage = 'run'
     args, cfg = Config.load_args(usage=usage)
     cfg = update_global_variable(cfg, cfg)
 
     exp = cfg.exp
-    if 'CUDA_VISIBLE_DEVICES' not in os.environ:
-        os.environ['CUDA_VISIBLE_DEVICES'] = ', '.join([str(gpu) for gpu in cfg.gpus])
+    # if 'CUDA_VISIBLE_DEVICES' not in os.environ:
+    #     os.environ['CUDA_VISIBLE_DEVICES'] = ', '.join([str(gpu) for gpu in cfg.gpus])
+    os.environ["CUDA_VISIBLE_DEVICES"]="2"
     print(f'Using GPUs: {os.environ["CUDA_VISIBLE_DEVICES"]}')
     print('Write to {}'.format(exp))
     # write the parameter to the exp
@@ -161,6 +176,7 @@ def main():
         model.base_iter = base_iter
         renderer = load_object(cfg.train.render.module, cfg.train.render.args)
         trainer = Trainer(cfg, model, renderer, logdir=outdir)
+        print("useddevice:",device)
         trainer.to(device)
         trainer.init(dataset)
         trainer.fit(dataset)

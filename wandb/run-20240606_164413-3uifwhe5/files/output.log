@@ -1,0 +1,58 @@
+[Config] merge from parent file: config/Lihu_domi_all/dataset.yml
+[Config] merge from parent file: config/Lihu_domi_all/level_of_gaussian.yml
+[Config] merge from parent file: config/Lihu_domi_all/stage_8_4.yml
+[Config] replace key $root
+[Config] replace key $scale3d
+[Config] replace key $root
+[Config] replace key $scale3d
+[Config] replace key $PLYNAME
+[Config] replace key $PLYNAME
+[Config] replace key $PLYNAME
+[Config] replace key $PLYNAME
+[Config] replace key $xyz_scale
+[Config] replace key $scale3d
+[Config] replace key $PLYNAME
+[Config] replace key $xyz_scale
+[Config] replace key $max_steps
+[Config] replace key $dataset
+[Config] replace key $RGB_RENDER_L1_SSIM
+[Config] replace key $NAIVE_STAGE
+Using GPUs: 0
+Write to output/Lihu_domi_all/log
+Key is not in the template: split
+Using /root/.cache/torch_extensions/py310_cu121 as PyTorch extensions root...
+Creating extension directory /root/.cache/torch_extensions/py310_cu121/compute_radius...
+Detected CUDA files, patching ldflags
+Emitting ninja build file /root/.cache/torch_extensions/py310_cu121/compute_radius/build.ninja...
+/root/miniconda3/envs/log/lib/python3.10/site-packages/torch/utils/cpp_extension.py:1967: UserWarning: TORCH_CUDA_ARCH_LIST is not set, all archs for visible cards are included for compilation.
+If this is not desired, please set os.environ['TORCH_CUDA_ARCH_LIST'].
+  warnings.warn(
+Building extension module compute_radius...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+Loading extension module compute_radius...
+Traceback (most recent call last):
+  File "/root/repository/project/sci/test_l,og (copy)/LoG/apps/train.py", line 197, in <module>
+    main()
+  File "/root/repository/project/sci/test_l,og (copy)/LoG/apps/train.py", line 162, in main
+    model = load_object(cfg.model.module, cfg.model.args)
+  File "/root/repository/project/sci/test_l,og (copy)/LoG/LoG/utils/config.py", line 59, in load_object
+    module = importlib.import_module(module_path)
+  File "/root/miniconda3/envs/log/lib/python3.10/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1050, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1027, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1006, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 688, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 883, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/root/repository/project/sci/test_l,og (copy)/LoG/LoG/model/level_of_gaussian.py", line 11, in <module>
+    from ..cuda.compute_radius import compute_radius_module
+  File "/root/repository/project/sci/test_l,og (copy)/LoG/LoG/cuda/compute_radius.py", line 3, in <module>
+    compute_radius_module = load(
+  File "/root/miniconda3/envs/log/lib/python3.10/site-packages/torch/utils/cpp_extension.py", line 1309, in load
+    return _jit_compile(
+  File "/root/miniconda3/envs/log/lib/python3.10/site-packages/torch/utils/cpp_extension.py", line 1745, in _jit_compile
+    return _import_module_from_library(name, build_directory, is_python_module)
+  File "/root/miniconda3/envs/log/lib/python3.10/site-packages/torch/utils/cpp_extension.py", line 2143, in _import_module_from_library
+    module = importlib.util.module_from_spec(spec)
+ImportError: /root/.cache/torch_extensions/py310_cu121/compute_radius/compute_radius.so: cannot open shared object file: No such file or directory

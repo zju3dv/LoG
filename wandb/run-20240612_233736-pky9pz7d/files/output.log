@@ -1,0 +1,54 @@
+[Config] merge from parent file: config/Yingrenshi/dataset.yml
+[Config] merge from parent file: config/Yingrenshi/level_of_gaussian.yml
+[Config] merge from parent file: config/Yingrenshi/stage_8_4.yml
+[Config] replace key $root
+[Config] replace key $scale3d
+[Config] replace key $root
+[Config] replace key $scale3d
+[Config] replace key $PLYNAME
+[Config] replace key $PLYNAME
+[Config] replace key $PLYNAME
+[Config] replace key $PLYNAME
+[Config] replace key $xyz_scale
+[Config] replace key $scale3d
+[Config] replace key $PLYNAME
+[Config] replace key $xyz_scale
+[Config] replace key $max_steps
+[Config] replace key $dataset
+[Config] replace key $RGB_RENDER_L1_SSIM
+[Config] replace key $NAIVE_STAGE
+Using GPUs: 0
+Write to output/Yingrenshi/log
+Key is not in the template: split
+Using /root/.cache/torch_extensions/py311_cu118 as PyTorch extensions root...
+Creating extension directory /root/.cache/torch_extensions/py311_cu118/compute_radius...
+Detected CUDA files, patching ldflags
+Emitting ninja build file /root/.cache/torch_extensions/py311_cu118/compute_radius/build.ninja...
+/root/miniconda3/envs/log/lib/python3.11/site-packages/torch/utils/cpp_extension.py:1967: UserWarning: TORCH_CUDA_ARCH_LIST is not set, all archs for visible cards are included for compilation.
+If this is not desired, please set os.environ['TORCH_CUDA_ARCH_LIST'].
+  warnings.warn(
+Building extension module compute_radius...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+Loading extension module compute_radius...
+Traceback (most recent call last):
+  File "/root/repository/project/sci/log/LoG/apps/train.py", line 197, in <module>
+    main()
+  File "/root/repository/project/sci/log/LoG/apps/train.py", line 162, in main
+    model = load_object(cfg.model.module, cfg.model.args)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/repository/project/sci/log/LoG/LoG/utils/config.py", line 61, in load_object
+    obj = getattr(module, name)(**extra_args, **module_args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/repository/project/sci/log/LoG/LoG/model/level_of_gaussian.py", line 179, in __init__
+    self.gaussian = GaussianPoint(**gaussian)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/repository/project/sci/log/LoG/LoG/model/level_of_gaussian.py", line 106, in __init__
+    xyz, colors, scales = create_from_point(**init_ply)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/repository/project/sci/log/LoG/LoG/utils/file.py", line 80, in create_from_point
+    xyz, colors = read_ply_and_log(filename, scale3d, **kwargs)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/repository/project/sci/log/LoG/LoG/utils/file.py", line 42, in read_ply_and_log
+    assert os.path.exists(filename), f'file not found: {filename}'
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: file not found: data/Yingrenshi/sparse_align/sparse.npz

@@ -51,13 +51,13 @@ Execute the colmap pipeline to obtain sparse reconstruction:
 ```bash
 data=<path_to_your_dataset>
 # single camera
-colmap feature_extractor --database_path ${data}/database.db --image_path ${data}/images --ImageReader.camera_model OPENCV --ImageReader.single_camera 1  --SiftExtraction.use_gpu 0
+colmap feature_extractor --database_path ./database.db --image_path ${data}/images --ImageReader.camera_model OPENCV --ImageReader.single_camera 1  --SiftExtraction.use_gpu 1
 # multiple cameras
-colmap feature_extractor --database_path ${data}/database.db --image_path ${data}/images --ImageReader.camera_model OPENCV --ImageReader.single_camera_per_folder 1 --SiftExtraction.use_gpu 0
+colmap feature_extractor --database_path ./database.db --image_path ./images --ImageReader.camera_model OPENCV --ImageReader.single_camera_per_folder 1 --SiftExtraction.use_gpu 1
 # matching and mapper
-colmap exhaustive_matcher --database_path ${data}/database.db --SiftMatching.use_gpu 0 
+colmap exhaustive_matcher --database_path ./database.db --SiftMatching.use_gpu 0 
 mkdir -p ${data}/sparse
-colmap mapper --database_path ${data}/database.db --image_path ${data}/images --output_path ${data}/sparse
+colmap mapper --database_path ./database.db --image_path ./images --output_path ./sparse
 ```
 
 ### 3. Colmap Results Inspection
@@ -146,9 +146,11 @@ UrbanScene3D also provides the `Campus` sequence, covering an area of 1,300,000 
 ```bash
 colmap feature_extractor --database_path ${data}/database.db --image_path ${data}/images --ImageReader.camera_model OPENCV --ImageReader.single_camera_per_folder 1 --SiftExtraction.use_gpu 1
 # matching use GPS info from images, max_distance=300
+colmap spatial_matcher --database_path ./Yuehai/database.db --SpatialMatching.max_num_neighbors 200 --SpatialMatching.max_distance 300 --SiftMatching.use_gpu 1
 colmap spatial_matcher --database_path ${data}/database.db --SpatialMatching.max_num_neighbors 200 --SpatialMatching.max_distance 300 --SiftMatching.use_gpu 1
 mkdir ${data}/sparse
 colmap mapper --database_path ${data}/database.db --image_path ${data}/images --output_path ${data}/sparse
+colmap mapper --database_path ./Yuehai/database.db --image_path ./Yuehai/images --output_path ./Yuehai/sparse
 ```
 
 This process also takes approximately 2 days. After aligning with GPS information, the camera parameters are in units of 100 meters for easier handling.

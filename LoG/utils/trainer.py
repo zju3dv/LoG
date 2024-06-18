@@ -9,6 +9,8 @@ import torch.nn as nn
 from .recorder import Recorder
 from .config import load_object, Config
 from collections import defaultdict
+import wandb
+
 # import matplotlib.pyplot as plt
 
 def imwrite(imgname, img):
@@ -143,7 +145,7 @@ class Trainer(nn.Module):
 
     def training_step(self, model, data, step=True, accumulate_step=1):
         batch = prepare_batch(data, self.device)
-        output = self.render(batch, model)
+        output = self.render(batch, model) 
         # check the visible points
         if 'index' in output['visibility_flag'][0].keys() and output['visibility_flag'][0]['index'].shape[0] == 0:
             if 'index_node' in output['visibility_flag'][0].keys():
@@ -456,6 +458,9 @@ class Trainer(nn.Module):
         return False
 
     def fit(self, dataset):
+        
+
+
         self.global_iterations = 0
         self.global_start_time = time.time()
         for stage_name, stage in self.cfg.train.stages.items():
@@ -496,18 +501,19 @@ class Trainer(nn.Module):
                     need_log = False
                     self.log_in_training(iteration, len(trainloader), data, moving_mean_loss / self.log_inverval, output)
                     if (iteration + 1) % self.log_inverval == 0 and iteration > 0:
+                        # wandb.log({"global_iteration": self.global_iterations, "train/loss_mean": moving_mean_loss / self.log_inverval})
                         self.recorder.log(self.global_iterations, 'train/loss_mean', moving_mean_loss / self.log_inverval)
                         moving_mean_loss = 0
                 del output, loss
-                if self.val is not None and (iteration + 1) % self.cfg.val.iteration == 0:
-                    self.make_validation(self.global_iterations)
+                # if self.val is not None and (iteration + 1) % self.cfg.val.iteration == 0:
+                #     self.make_validation(self.global_iterations)
                 # Do the overlook
                 if self.overlook is not None and self.check_iteration(stage_name, iteration + 1, self.cfg.overlook.iteration):
                     self.make_overlook()
                 if self.overlook_oneframe is not None and self.cfg.overlook_oneframe.iteration > 0 and (iteration) % self.cfg.overlook_oneframe.iteration == 0:
                     self.make_overlook_oneframe()
                 if (iteration + 1) % self.save_interval == 0:
-                    if True:
+                    if False:
                         name = 'model_latest.pth'
                     else:
                         name = f'model_{self.global_iterations:06d}.pth'
@@ -523,9 +529,14 @@ class Trainer(nn.Module):
                                 self.make_overlook(iteration=self.global_iterations+1)
                             # self.make_overlook(mode='grad', iteration=self.global_iterations + 1)
                                 # self.make_overlook(mode='offset', iteration=self.global_iterations + 1)
+                            # wandb.log({"global_iteration": self.global_iterations, "train/num_points": self.model.num_points})
                             self.recorder.log(self.global_iterations, 'train/num_points', self.model.num_points)
                 if self.global_iterations % 10 == 0:
                     self.recorder.log(self.global_iterations, 'train/lr', self.model.lr)
+                    # log metrics to wandb
+                    # wandb.log({"global_iteration": self.global_iterations, "train/lr": self.model.lr})
                 self.global_iterations += 1
             ckptname = join(self.exp, f'model_{stage_name}.pth')
-            self.save_ckpt(ckptname)            
+            self.save_ckpt(ckptname)     
+
+        # wandb.finish()       

@@ -84,7 +84,7 @@ class ImageBase:
         if scale3d > 0:
             for camname, camera in cameras.items():
                 center = - np.dot(camera['R'].T, camera['T'] * scale3d) - self.offset
-                T = - camera['R'] @ center
+                T = - camera['R'] @ center # 本質上是轉兩次
                 camera['center'] = center
                 camera['T'] = T
         if scale_camera_K != 1.:

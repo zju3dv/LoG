@@ -71,6 +71,8 @@ class ImageDataset(ImageBase):
         else:
             newK, roi = cv2.getOptimalNewCameraMatrix(camera['K'], camera['dist'], 
                         (width, height), 0, (width,height), centerPrincipalPoint=True)
+            # 根据相机内参矩阵、畸变参数和新的相机内参矩阵，计算畸变矫正映射
+            #add 
             mapx, mapy = cv2.initUndistortRectifyMap(camera['K'], camera['dist'], None, newK, (width, height), 5)
         return mapx, mapy, newK
 

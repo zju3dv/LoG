@@ -1,4 +1,5 @@
 import argparse, os, math
+import numpy as np
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 from tqdm import tqdm

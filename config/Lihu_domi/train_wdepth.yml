@@ -1,0 +1,37 @@
+parents:
+  - config/Lihu_domi/dataset.yml
+  - config/Lihu_domi/level_of_gaussian.yml
+  - config/Lihu_domi/stage_8_4.yml
+
+exp: output/Lihu_domi_lowres/log_wdepth_val
+gpus: [0]
+
+log_interval: 1000
+save_interval: 100_000
+
+max_steps: 300
+
+dataset:
+  module: LoG.dataset.colmap.DepthDataset
+  args:
+    depth_scale: 8
+
+RGB_RENDER_L1_SSIM:
+  module: LoG.render.renderer.NaiveRendererAndLoss
+  args:
+    use_origin_render: False
+    use_randback: True
+    render_depth: True
+
+train:
+  dataset: $dataset
+  render: $RGB_RENDER_L1_SSIM
+  stages: $NAIVE_STAGE
+  init:
+    method: scale_min
+    dataset_state:
+      scale: 4
+
+val:
+  iteration: 60000
+  dataset: $val_dataset

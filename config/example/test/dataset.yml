@@ -16,6 +16,8 @@ dataset:
     scale3d: $scale3d
     ext: .JPG
   
+
+  
 val_dataset:
   module: LoG.dataset.colmap.ImageDataset
   args:

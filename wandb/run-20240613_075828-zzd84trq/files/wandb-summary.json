@@ -1,0 +1,1 @@
+{"global_iteration": 269999, "train/lr": 2.5359848183796167e-05, "_timestamp": 1718245119.6675665, "_runtime": 8410.708355426788, "_step": 18377, "train/loss_mean": 0.036928157417103646, "train/num_points": 33513144, "_wandb": {"runtime": 8433}}

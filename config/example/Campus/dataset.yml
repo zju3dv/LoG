@@ -1,5 +1,5 @@
-root: data/Campus
-PLYNAME: data/Campus/sparse_align/sparse.npz
+root: data/Yuehai_downsample
+PLYNAME: data/Yuehai_downsample/sparse_align/sparse.npz
 scale3d: 1.
 xyz_scale: 1.
 ground_height: &ground_height 1.18
@@ -53,50 +53,50 @@ overlook:
       zfar: 200.
 
 
-demo_interpolate:
-  model_state:
-    enable_sh: True
-    log_query: False
-  dataset:
-    module: LoG.dataset.demo.InterpolatePath
-    args:
-      cameras: $PLYNAME
-      scale: 4
-      steps: 600
-      subs:
-        - 110MEDIA/DJI_0001
-        - 110MEDIA/DJI_0333
-        - 118MEDIA/DJI_0666
-        - 118MEDIA/DJI_0999
-
-demo_overlook:
-  iteration: 1000
-  dataset:
-    module: LoG.dataset.overlook.OverlookByScale
-    args:
-      focal: 3000.
-      shape: [1920, 1080]
-      axis_up: "z"
-      ground_height: *ground_height
-      scales: [1, 8]
-      border_length: 15.
-      lookat: [0., 0., 0]
-      step: 10
-      zfar: 200.
-
-demo_lookat:
-  dataset:
-    module: LoG.dataset.overlook.LookAt
-    args:
-      K: [[1836, 0., 1368],
-          [0, 1836, 912],
-          [0, 0., 1.]]
-      scale: 1
-      H: 1824
-      W: 2736
-      lookat: [0., -1., *ground_height]
-      ranges: [[0, 360, 361]]
-      radius: [[0.5, 10., 361]]
-      angle: 45
-  model_state:
-    enable_sh: True
+#demo_interpolate:
+#  model_state:
+#    enable_sh: True
+#    log_query: False
+#  dataset:
+#    module: LoG.dataset.demo.InterpolatePath
+#    args:
+#      cameras: $PLYNAME
+#      scale: 4
+#      steps: 600
+#      subs:
+#        - 110MEDIA/DJI_0001
+#        - 110MEDIA/DJI_0333
+#        - 118MEDIA/DJI_0666
+#        - 118MEDIA/DJI_0999
+#
+#demo_overlook:
+#  iteration: 1000
+#  dataset:
+#    module: LoG.dataset.overlook.OverlookByScale
+#    args:
+#      focal: 3000.
+#      shape: [1920, 1080]
+#      axis_up: "z"
+#      ground_height: *ground_height
+#      scales: [1, 8]
+#      border_length: 15.
+#      lookat: [0., 0., 0]
+#      step: 10
+#      zfar: 200.
+#
+#demo_lookat:
+#  dataset:
+#    module: LoG.dataset.overlook.LookAt
+#    args:
+#      K: [[1836, 0., 1368],
+#          [0, 1836, 912],
+#          [0, 0., 1.]]
+#      scale: 1
+#      H: 1824
+#      W: 2736
+#      lookat: [0., -1., *ground_height]
+#      ranges: [[0, 360, 361]]
+#      radius: [[0.5, 10., 361]]
+#      angle: 45
+#  model_state:
+#    enable_sh: True

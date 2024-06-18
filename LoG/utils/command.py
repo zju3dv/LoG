@@ -61,7 +61,7 @@ def copy_git_tracked_files(code_dir, output_base_dir):
     # make new dir
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir = os.path.join(output_base_dir, f"code_backup_{timestamp}")
-    os.makedirs(output_dir, exist_ok=True)
-    filenames = copy_files('./', output_dir)
-    print(f">>> Code {len(filenames)} files has been copied to {output_dir}")
+    # os.makedirs(output_dir, exist_ok=True)
+    # filenames = copy_files('./', output_dir)
+    # print(f">>> Code {len(filenames)} files has been copied to {output_dir}")
     return output_dir

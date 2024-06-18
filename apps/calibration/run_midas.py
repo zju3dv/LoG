@@ -25,6 +25,6 @@ if __name__ == '__main__':
     for input_path, output_path in zip(input_paths, output_paths):
         if os.path.exists(output_path) and len(os.listdir(output_path)) == len(os.listdir(input_path)):
             continue
-        cmd = f'python run_midas.py --model_type dpt_beit_large_512 --input_path "{input_path}" --output_path "{output_path}" --grayscale'
+        cmd = f'python run.py --model_type dpt_beit_large_512 --input_path "{input_path}" --output_path "{output_path}" --grayscale'
         print(cmd)
         os.system(cmd)

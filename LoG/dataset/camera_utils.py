@@ -116,6 +116,23 @@ def write_extri(extri_name, cameras):
     return 0
 
 def read_camera(intri_name, extri_name, cam_names=[]):
+    """
+    读取相机内参和外参参数。
+
+    从给定的内参和外参文件中读取每个相机的参数。内参文件包含相机的内在参数，
+    如焦距、图像尺寸等；外参文件包含相机的外部参数，如相机的位置、旋转等。
+
+    参数:
+    - intri_name: 内参文件名。
+    - extri_name: 外参文件名。
+    - cam_names: 相机名称列表，默认为空列表。
+
+    返回:
+    - cams: 包含所有相机参数的字典，每个相机参数包括内参矩阵K、逆矩阵invK、
+            影像高度H、影像宽度W、旋转向量Rvec、平移向量Tvec、旋转矩阵R、
+            旋转平移矩阵RT、光心、投影矩阵P、畸变参数dist。
+    """
+    # 确保内参和外参文件存在
     assert os.path.exists(intri_name), intri_name
     assert os.path.exists(extri_name), extri_name
 
@@ -125,6 +142,7 @@ def read_camera(intri_name, extri_name, cam_names=[]):
     cam_names = intri.read('names', dt='list')
     for cam in cam_names:
         cams[cam] = {}
+        # 读取并计算相机的内参矩阵及其逆矩阵
         cams[cam]['K'] = intri.read('K_{}'.format( cam))
         cams[cam]['invK'] = np.linalg.inv(cams[cam]['K'])
         H = intri.read('H_{}'.format(cam), dt='int')
@@ -134,6 +152,8 @@ def read_camera(intri_name, extri_name, cam_names=[]):
             H, W = -1, -1
         cams[cam]['H'] = H
         cams[cam]['W'] = W
+
+        # 读取相机的旋转向量和平移向量，计算旋转平移矩阵
         Rvec = extri.read('R_{}'.format(cam))
         Tvec = extri.read('T_{}'.format(cam))
         assert Rvec is not None, cam
@@ -144,10 +164,15 @@ def read_camera(intri_name, extri_name, cam_names=[]):
         cams[cam]['R'] = R
         cams[cam]['Rvec'] = Rvec
         cams[cam]['T'] = Tvec
-        cams[cam]['center'] = - Rvec.T @ Tvec
+
+        # 计算相机的光心 可能有问题  cams[cam]['center'] = -R.T @ Tvec
+        cams[cam]['center'] = - R.T @ Tvec
+
+        # 计算相机的投影矩阵
         P[cam] = cams[cam]['K'] @ cams[cam]['RT']
         cams[cam]['P'] = P[cam]
 
+        # 尝试读取相机的畸变参数，若不存在则尝试读取备用参数
         cams[cam]['dist'] = intri.read('dist_{}'.format(cam))
         if cams[cam]['dist'] is None:
             cams[cam]['dist'] = intri.read('D_{}'.format(cam))
