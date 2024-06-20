@@ -156,7 +156,7 @@ def main():
     os.makedirs(exp, exist_ok=True)
     if cfg.split == 'train':
         print(cfg, file=open(os.path.join(exp, 'config.yaml'), 'w'))
-    from LoG.utils.trainer import Trainer, seed_everything
+    from LoG.utils.trainer import Trainer.seed_everything
     seed_everything(666)
 
     device = torch.device('cuda')
@@ -194,6 +194,10 @@ def main():
         renderer = load_object(cfg.train.render.module, cfg.train.render.args)
         renderer.split = 'val'
         validate_for_metric(exp, dataset, model, renderer, device)
+    elif cfg.split == 'renderability':
+        pass
+
+
 
 if __name__ == '__main__':
     main()

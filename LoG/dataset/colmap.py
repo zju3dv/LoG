@@ -37,6 +37,7 @@ def read_undistort_rescale_write(info):
             mapx, mapy = cv2.initUndistortRectifyMap(camera['K'], camera['dist'], None, newK, (width, height), 5)
             camera['K'] = newK
         if mapx is not None and mapy is not None:
+            # 重新映射
             img = cv2.remap(img, mapx, mapy, cv2.INTER_LINEAR)
     else:
         if 'mapx' not in info['camera'].keys():

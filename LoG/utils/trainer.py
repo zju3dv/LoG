@@ -145,7 +145,11 @@ class Trainer(nn.Module):
 
     def training_step(self, model, data, step=True, accumulate_step=1):
         batch = prepare_batch(data, self.device)
-        output = self.render(batch, model) 
+        output = self.render(batch, model)
+        # write out the image immediately
+        cv2.imwrite("../../testimage/img_true"+batch['imgname'][0].split('/')[-1],batch['image'].squeeze(0).detach().cpu()numpy())
+        cv2.imwrite("../../testimage/img_gene"+batch['imgname'][0].split('/')[-1],output['render'][0].detach().cpu().permute(1,2,0).numpy())
+
         # check the visible points
         if 'index' in output['visibility_flag'][0].keys() and output['visibility_flag'][0]['index'].shape[0] == 0:
             if 'index_node' in output['visibility_flag'][0].keys():
@@ -173,7 +177,8 @@ class Trainer(nn.Module):
             dataset.set_state(**self.cfg.train.init.dataset_state)
             valloader = self.val_loader(dataset, num_workers=8)
             self.model.at_init_start()
-            for iteration, data in enumerate(tqdm(valloader, desc='initialize the model')):
+            for iteration, data in enumerate(valloader):
+            # for iteration, data in enumerate(tqdm(valloader, desc='initialize the model')):
                 # timer the process
                 self.model.clear()
                 batch = prepare_batch(data, self.device)

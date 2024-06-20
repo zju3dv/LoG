@@ -115,6 +115,7 @@ class NaiveRendererAndLoss(BaseRender):
             self.background = background
 
     def render(self, camera, rasterizer, model, extra_params={}):
+        #ret refer to all the gaussian points propertes
         ret = model.get_all(camera, rasterizer, **extra_params)
         if len(ret) == 0:
             device = camera['world_view_transform'].device
@@ -130,14 +131,24 @@ class NaiveRendererAndLoss(BaseRender):
         colors = ret['colors']
         scales = ret['scaling']
         rotations = ret['rotation']
+
         cov3D = None
         empty_xyz = model.empty_xyz
+        
         screenspace_points = torch.zeros_like(xyz, dtype=empty_xyz.dtype, device=empty_xyz.device, requires_grad=True)
         try:
             screenspace_points.retain_grad()
         except:
             pass
         model_data = ret
+        # args are all the input val
+        """
+        xyz: points coord
+        screenspace_points: zero
+        shs: 
+        colors:
+        cov3D: None
+        """
         name_args = {
             'means3D': xyz,
             'means2D': screenspace_points,
@@ -150,7 +161,9 @@ class NaiveRendererAndLoss(BaseRender):
         }
         if not self.use_origin_render and not model.training:
             name_args['use_filter'] = False
+        # 渲染图像的地方
         ret = rasterizer(**name_args)
+        # radii ?  这里的point_id_pixel出现了重复
         if len(ret) == 5:
             rendered_image, radii, point_id_pixel, point_weight_pixel, point_weight = ret
             point_id, point_count = torch.unique(point_id_pixel, sorted=True, return_counts=True)
@@ -237,6 +250,8 @@ class NaiveRendererAndLoss(BaseRender):
                     pixel_radius = 3 * 2 ** (random_log2 * 2)
                 model.tree.min_resolution_pixel = pixel_radius
             model.prepare(rasterizer, camera)
+            #在这里，camara对应一个图片的信息，rasterizer对应一个相机的参数，model对应当前所有primitive
+            #render_pkg 为模型输出数据 ，model_data 为模型输入数据
             render_pkg, model_data = self.render(camera, rasterizer, model)
             if model.training and self.use_rand_radius:
                 model.tree.min_resolution_pixel = origin_radius

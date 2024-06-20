@@ -38,6 +38,7 @@ class Gaussian(nn.Module):
 
     @staticmethod
     def _visible_flag_by_camera(xyz, camera, padding=0.05, squeeze=False):
+        # 判斷gaussian 是否在camera的視角內
         full_proj_transform = camera['full_proj_transform']
         if squeeze:
             full_proj_transform = full_proj_transform[0]
