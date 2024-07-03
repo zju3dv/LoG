@@ -1,9 +1,9 @@
 parents:
-  - config/Yingrenshi/dataset.yml
-  - config/Yingrenshi/level_of_gaussian.yml
-  - config/Yingrenshi/stage_8_4.yml
+  - config/Yingrenshi_add_path/dataset.yml
+  - config/Yingrenshi_add_path/level_of_gaussian.yml
+  - config/Yingrenshi_add_path/stage_8_4.yml
 
-exp: output/Yingrenshi_test/log
+exp: output/Yingrenshi_add_path/log
 gpus: [0]
 
 log_interval: 1000
@@ -17,6 +17,9 @@ RGB_RENDER_L1_SSIM:
     use_origin_render: False
     use_randback: True
 
+# val:
+#   iteration: 1
+
 train:
   dataset: $dataset
   render: $RGB_RENDER_L1_SSIM
@@ -27,5 +30,5 @@ train:
       scale: 4
 
 # val:
-#   dataset: $val_dataset
-#   iteration: 10000
+#   # dataset: $val_dataset
+#   iteration: 1

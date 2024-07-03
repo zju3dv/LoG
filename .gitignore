@@ -13,3 +13,7 @@ images
 *.png
 *.out
 *.obj
+wandb
+testimage
+.vscode
+testpython

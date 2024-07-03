@@ -1,6 +1,5 @@
 root: data/Yingrenshi
 PLYNAME: data/Yingrenshi/sparse_align/sparse.npz
-colmap_ecef_path: data/Yingrenshi/sparse/1
 scale3d: 1.
 xyz_scale: 1.
 ground_height: &ground_height 1.18
@@ -17,24 +16,7 @@ dataset:
     zfar: 100.
     scale3d: $scale3d
     ext: .JPG
-  
-renderability_dataset:
-  module: LoG.dataset.colmap.ImageDataset
-  args:
-    root: $root
-    pre_undis: True
-    share_camera: False
-    scales: [1, 2, 4, 8]
-    crop_size: [-1, -1]
-    znear: 0.001
-    zfar: 100.
-    scale3d: $scale3d
-    ext: .JPG
-    gps:
-      args:
-        bef_filename: block_exchange.xml
-        gps_filename: GPS.txt
-        colmap_ecef_image_path: $colmap_ecef_path
+    
   
 val_dataset:
   module: LoG.dataset.colmap.ImageDataset

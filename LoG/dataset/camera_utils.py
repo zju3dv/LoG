@@ -3,6 +3,8 @@ import cv2
 import numpy as np
 import os
 from os.path import join
+import struct
+from ..utils.colmap_utils import Image
 
 class FileStorage(object):
     def __init__(self, filename, isWrite=False):
@@ -401,3 +403,15 @@ def get_center_and_diag(cam_centers):
     dist = np.linalg.norm(cam_centers - center, axis=1)
     diagonal = np.max(dist) * 1.1
     return center.flatten(), diagonal
+
+def get_colmap_transform(path,ext='.bin'):
+    from ..utils.colmap_utils import read_images_text, read_images_binary, qvec2rotmat
+    if ext == '.txt':
+        images = read_images_text(os.path.join(path, "images" + ext))
+    else:
+        images = read_images_binary(os.path.join(path, "images" + ext))
+    cam_origin = images[1]
+    t = cam_origin.tvec.reshape(3, 1)
+    R = qvec2rotmat(cam_origin.qvec)
+    return R,t.reshape(-1,3)
+

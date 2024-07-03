@@ -10,7 +10,8 @@ NAIVE_STAGE:
         num_workers: *num_workers
     dataset_state:
       scale: 8
-    model_state: {}
+    model_state: 
+      enable_sh: True
   # init:
   #   loader:
   #     module: iteration

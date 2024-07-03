@@ -147,8 +147,10 @@ class Trainer(nn.Module):
         batch = prepare_batch(data, self.device)
         output = self.render(batch, model)
         # write out the image immediately
-        cv2.imwrite("../../testimage/img_true"+batch['imgname'][0].split('/')[-1],batch['image'].squeeze(0).detach().cpu()numpy())
-        cv2.imwrite("../../testimage/img_gene"+batch['imgname'][0].split('/')[-1],output['render'][0].detach().cpu().permute(1,2,0).numpy())
+        img_true=batch['image'].squeeze(0).detach().cpu().numpy()*255
+        img_gene=output['render'][0].detach().cpu().permute(1,2,0).numpy()*255
+        cv2.imwrite("testimage/img_true"+batch['imgname'][0].split('/')[-1],img_true)
+        cv2.imwrite("testimage/img_gene"+batch['imgname'][0].split('/')[-1],img_gene)
 
         # check the visible points
         if 'index' in output['visibility_flag'][0].keys() and output['visibility_flag'][0]['index'].shape[0] == 0:
@@ -169,6 +171,7 @@ class Trainer(nn.Module):
                 self.recorder.log(self.global_iterations, f'train/loss_{key}', val)
             self.recorder.log(self.global_iterations, 'train/loss', loss)
         return True, output, loss.item()
+    
 
     def init(self, dataset):
         dataset.read_img = False
@@ -480,7 +483,7 @@ class Trainer(nn.Module):
                 self.model.load_state_dict(statedict['state_dict'], split='train')
                 # self.model.check_num_points()
                 self.global_iterations += stage.loader.args.iterations * self.model.base_iter
-                continue
+                # continue
             dataset.set_state(**stage.dataset_state)
             self.model.set_stage(stage_name)
             self.model.set_state(**stage.model_state)
@@ -495,6 +498,7 @@ class Trainer(nn.Module):
             need_log = True
             moving_mean_loss = 0
             for iteration, data in enumerate(trainloader):
+                cam=data['camera']
                 self.model.clear()
                 self.render.iteration = self.global_iterations
                 flag, output, loss = self.training_step(self.model, data)

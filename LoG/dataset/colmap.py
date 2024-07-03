@@ -7,6 +7,9 @@ from PIL import Image
 from .image_base import ImageBase
 from .base import prepare_camera, rescale_camera
 from .camera_utils import get_center_and_diag
+from .gps import GPS_dataset
+from .camera_utils import get_colmap_transform
+
 
 def read_undistort_rescale_write(info):
     flag_read_img = False
@@ -103,7 +106,7 @@ class ImageDataset(ImageBase):
                 scale3d=1., ext='.JPG', images='images', scale_camera_K=1., 
                 mask_ignore=None,
                  pre_undis=True, share_camera=False, crop_size=[-1, -1],
-                 crop_ltrb=None,
+                 crop_ltrb=None,gps=None,
                  **kwargs) -> None:
         super().__init__(**kwargs)
         self.root = os.path.abspath(root)
@@ -116,6 +119,9 @@ class ImageDataset(ImageBase):
         self.scale3d = scale3d
         self.crop_size = crop_size
         self.crop_ltrb = crop_ltrb
+        self.use_gps= True if gps is not None else False
+        
+
         print(f'[{self.__class__.__name__}] set scales: {scales}, crop size: {crop_size}')
         if self.cache is None:
             self.cache = join(self.root, 'cache')
@@ -128,11 +134,14 @@ class ImageDataset(ImageBase):
         self.cachedir = cachedir
         print(f'[{self.__class__.__name__}] cache dir: {self.cachedir}')
         flag, infos = self.read_cache(name=cachedir+'.pkl')
+        # flag = False
         if not flag:
             cameras = self.check_cameras(scale3d=scale3d, scale_camera_K=scale_camera_K)
             # undistort and scale
             cameras_cache = {}
             infos = []
+
+             
             for camname, camera_dis in cameras.items():
                 if pre_undis:
                     camera = self.check_undis_camera(camname, cameras_cache, camera_dis, share_camera)
@@ -145,6 +154,8 @@ class ImageDataset(ImageBase):
                 if not os.path.exists(imgname):
                     print('Not exists:', imgname)
                     continue
+
+                
                 infos.append({
                     'root': self.root,
                     'cache': cachedir,
@@ -157,14 +168,30 @@ class ImageDataset(ImageBase):
                 read_undistort_rescale_write(info)
                 info['camera'].pop('mapx', None)
                 info['camera'].pop('mapy', None)
+            
+            # add gps data
+            if self.use_gps:
+                gps_list= GPS_dataset(root,gps.args.bef_filename)   
+                for index,info in enumerate(tqdm(infos)):
+                    info['gps']=gps_list.positions[index]
+
             self.write_cache(infos, name=cachedir+'.pkl')
         
+        if(self.use_gps):
+            colmap_transform_path=gps.args.colmap_ecef_image_path
+            self.colmap_transform=list(get_colmap_transform(colmap_transform_path))
+        
+
         centers = np.stack([-info['camera']['R'].T @ info['camera']['T'] for info in infos], axis=0)
         offset, radius = get_center_and_diag(centers)
         print(f'[{self.__class__.__name__}] offset: {offset}, radius: {radius}')
         self.current_scale = scales[-1]
         self.infos = infos
         print(f'[{self.__class__.__name__}] init dataset with {len(infos)} images')
+
+    def get_colmap_transform(self):
+        return self.colmap_transform[0],self.colmap_transform[1]
+    
 
     def set_state(self, scale=None, crop_size=None, downsample_scale=1, namelist=None):
         if scale is not None:
@@ -254,8 +281,48 @@ class ImageDataset(ImageBase):
             ret['mask_ignore'] = msk
         ret.update(data.get('extra', {}))
         return ret
+    
+    def get_origin_intrinsic_feature(self):
+        assert len(self.infos)>0
+        feature_dict={}
+        if self.downsample_scale != 1:
+            scale = self.downsample_scale * self.current_scale
+            camera = rescale_camera(self.infos[0]['camera'], scale)
+            if self.read_image:
+                # cv2.INTER_AREA for anti-alias resize
+                img = cv2.resize(img, (camera['W'], camera['H']), interpolation=cv2.INTER_AREA)
+        else:
+            camera = rescale_camera(self.infos[0]['camera'], self.current_scale)
+        camera = prepare_camera(camera, scale=1, znear=self.znear, zfar=self.zfar)
+        #control limited value only the extrinsic feature
+        feature_dict['K']=camera['K']
+        feature_dict['image_height']=camera['image_height']
+        feature_dict['image_width']=camera['image_width']
+        feature_dict['FoVx']=camera['FoVx']
+        feature_dict['FoVy']=camera['FoVy']
+        feature_dict['znear']=self.znear
+        feature_dict['zfar']=self.zfar
+        feature_dict['scale']=camera['scale']
+        
 
-class DepthDataset(ImageDataset):
+        return feature_dict
+
+    
+    def get_original_ecef_coord(self):
+        import pyproj
+        assert self.infos[0]['gps'] is not None
+        gps_data=self.infos[0]['gps'].get_data()
+        ecef = pyproj.Proj(proj='geocent', ellps='WGS84', datum='WGS84')
+        wgs84 = pyproj.Proj(proj='latlong', ellps='WGS84', datum='WGS84')
+
+        # lon lat alt -> x y z
+        x, y, z = pyproj.transform(wgs84, ecef, gps_data[1], gps_data[0], gps_data[2])
+
+        return [x, y, z]
+
+
+
+class DepthDataset(ImageDataset):   
     def __init__(self, depth_scale, depth_dir='depth', **kwargs):
         super().__init__(**kwargs)
         self.depth_scale = depth_scale

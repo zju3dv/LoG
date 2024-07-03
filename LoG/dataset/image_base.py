@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 
 class ImageBase:
-    def __init__(self, cache=None, cameras='', namelist=None, ignorelist=None, znear=0.01, zfar=100., offset=[0., 0., 0.]) -> None:
+    def __init__(self, cache=None, cameras='', namelist=None, ignorelist=None, znear=0.01, zfar=100., offset=[0., 0., 0.],gps=None) -> None:
         self.cache = cache
         self.cameras = cameras
         if namelist is not None:
