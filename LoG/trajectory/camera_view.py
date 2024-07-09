@@ -74,25 +74,58 @@ class Camera_view(object):
         cy=y_size/2
         self.K=np.array([[fx,0,cx],[0,fy,cy],[0,0,1]])
 
-    def feature_dict(self):
-        feature_d={}
-        feature_d['camera_center']=self.world_center
-        feature_d['K']=self.K
-        feature_d['R']=self.R
-        feature_d['T']=self.T
-        feature_d['FoVx']=self.fovx
-        feature_d['FoVy']=self.fovy
-        feature_d['image_width']=self.image_width
-        feature_d['image_height']=self.image_height
-        feature_d['name']=self.name
-        feature_d['scale']=self.scale
-        feature_d['znear']=self.znear
-        feature_d['zfar']=self.zfar
-        feature_d['w2c_matrix']=self.w2c_matrix
-        feature_d['world_view_transform']=self.w2c_matrix
-        feature_d['full_proj_transform']=self.full_projection_matrix
-        feature_d['full_projection_matrix']=self.full_projection_matrix
-        return feature_d
+    def get_camera_feature(self):
+        camera={}
+        camera['camera_center']=self.world_center
+        camera['K']=self.K
+        camera['R']=self.R
+        camera['T']=self.T
+        camera['FoVx']=self.fovx
+        camera['FoVy']=self.fovy
+        camera['image_width']=self.image_width
+        camera['image_height']=self.image_height
+        camera['name']=self.name
+        camera['scale']=self.scale
+        camera['znear']=self.znear
+        camera['zfar']=self.zfar
+        camera['w2c_matrix']=self.w2c_matrix
+        camera['world_view_transform']=self.w2c_matrix
+        camera['full_proj_transform']=self.full_projection_matrix
+        camera['full_projection_matrix']=self.full_projection_matrix
+
+        ret={
+            'camera':camera
+        }
+        return ret
+    
+    def get_camera_feature_torch(self):
+        camera={}
+        camera['camera_center']=torch.from_numpy(self.world_center)
+        camera['K']=torch.from_numpy(self.K)
+        camera['R']=torch.from_numpy(self.R)
+        camera['T']=torch.from_numpy(self.T)
+        camera['FoVx']=torch.tensor(self.fovx)
+        camera['FoVy']=torch.tensor(self.fovy)
+        camera['image_width']=torch.tensor(self.image_width)
+        camera['image_height']=torch.tensor(self.image_height)
+        camera['name']=self.name
+        camera['scale']=torch.tensor(self.scale)
+        camera['znear']=torch.tensor(self.znear)
+        camera['zfar']=torch.tensor(self.zfar)
+        camera['projection_matrix']=torch.from_numpy(self.c2s_matrix).T
+        camera['w2c_matrix']=torch.from_numpy(self.w2c_matrix)
+        camera['world_view_transform']=torch.from_numpy(self.w2c_matrix)
+        camera['full_proj_transform']=torch.from_numpy(self.full_projection_matrix)
+        camera['full_projection_matrix']=torch.from_numpy(self.full_projection_matrix)
+        for key, val in camera.items():
+            if isinstance(val, torch.Tensor):
+                camera[key]=camera[key].unsqueeze(0)
+            
+
+        ret={
+            'camera':camera
+        }
+        return ret
 
     def gen_R_by_axix(self,rot_type,rot_theta,R_origin):
         '''
@@ -173,8 +206,8 @@ class Camera_view(object):
 
         if input_intri_dict:
             C=Camera_view(coord,intrinsic_feature['K'], R, T, name=None, scale=intrinsic_feature['scale'], znear=intrinsic_feature['znear'], zfar=intrinsic_feature['zfar'])
-            C.fovx=intrinsic_feature['fovx']
-            C.fovy=intrinsic_feature['fovy']
+            C.fovx=intrinsic_feature['FoVx']
+            C.fovy=intrinsic_feature['FoVy']
             C.image_width=intrinsic_feature['image_width']
             C.image_height=intrinsic_feature['image_height']
         else:
@@ -194,7 +227,7 @@ class Camera_view(object):
         C.c2s_matrix = getProjectionMatrix2(C.K, C.image_height, C.image_width, C.znear, C.zfar)
         C.w2c_matrix=np.eye(4)
         C.w2c_matrix[:3,:3]=C.R
-        C.w2c_matrix[:3,3]=C.T
+        C.w2c_matrix[:3,3]=C.T.reshape(-1,3)
         C.full_projection_matrix=C.w2c_matrix@C.c2s_matrix
         return C
 

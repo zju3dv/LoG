@@ -98,7 +98,7 @@ def colmap_gen_R_xoy(z_axis):
     '''
     z_axis=z_axis/np.linalg.norm(z_axis)
     if(z_axis[2]>0):
-        x_axis=np.cross(np.array(z_axis,[0.,-1.,0.]))
+        x_axis=np.cross(z_axis,np.array([0.,-1.,0.]))
         x_axis=x_axis/np.linalg.norm(x_axis)
     else:
         x_axis=np.cross(np.array([0.,1.,0.],z_axis))
@@ -133,7 +133,7 @@ def cal_distance_GPS(position1,position2):
         from math import radians, cos, sin, asin, sqrt
 
         # 将经纬度转换为弧度
-        lat1, lon1, lat2, lon2 = map(radians, [position1.lat, position1.lon, position2.lat, position2.lon])
+        lon1, lat1, lon2,  lat2 = map(radians, [position1.lon, position1.lat, position2.lon, position2.lat])
         z1,z2=position1.alt,position2.alt
         # haversine公式
         dlon = lon2 - lon1
@@ -159,7 +159,7 @@ def GPU_to_colmap(gps_pos:List[float],R,T):
     wgs84 = pyproj.Proj(proj='latlong', ellps='WGS84', datum='WGS84')
 
     # transform wgs84 to ecef
-    x, y, z = pyproj.transform(wgs84, ecef, gps_pos[1], gps_pos[0], gps_pos[2],radians=False)
+    x, y, z = pyproj.transform(wgs84, ecef, gps_pos[0], gps_pos[1], gps_pos[2],radians=False)
     temp=np.dot(R, np.array([x, y, z]))
     camera_center = np.dot(R, np.array([x, y, z])) + T
     return camera_center

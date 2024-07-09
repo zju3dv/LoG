@@ -5,6 +5,7 @@ import os
 from os.path import join
 import struct
 from ..utils.colmap_utils import Image
+from scipy.spatial.transform import Rotation as Rot
 
 class FileStorage(object):
     def __init__(self, filename, isWrite=False):
@@ -405,6 +406,10 @@ def get_center_and_diag(cam_centers):
     return center.flatten(), diagonal
 
 def get_colmap_transform(path,ext='.bin'):
+    '''
+    RP_ecef + T = P_colmap
+    correct
+    '''
     from ..utils.colmap_utils import read_images_text, read_images_binary, qvec2rotmat
     if ext == '.txt':
         images = read_images_text(os.path.join(path, "images" + ext))
@@ -412,6 +417,8 @@ def get_colmap_transform(path,ext='.bin'):
         images = read_images_binary(os.path.join(path, "images" + ext))
     cam_origin = images[1]
     t = cam_origin.tvec.reshape(3, 1)
-    R = qvec2rotmat(cam_origin.qvec)
+    rotation = Rot.from_quat([cam_origin.qvec[1], cam_origin.qvec[2], cam_origin.qvec[3], cam_origin.qvec[0]])
+    R= rotation.as_matrix()
+    
     return R,t.reshape(-1,3)
 

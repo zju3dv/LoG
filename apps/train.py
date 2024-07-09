@@ -8,6 +8,7 @@ from LoG.trajectory.trajectory import Trajectory
 from LoG.trajectory.camera_view import Camera_view
 from LoG.trajectory.utils import GPU_to_colmap,colmap_gen_R_xoy
 from LoG.dataset.camera_utils import get_colmap_transform
+from LoG.dataset.colmap import batch_transform
 import cv2
 import torch
 import wandb
@@ -137,6 +138,7 @@ def renderability(exp, dataset, model, renderer,trajectory, device):
     model.to(device)
     # trajectory.to(device)
     model.eval()
+    model.training=True
     from LoG.utils.trainer import prepare_batch
     scale =1 
     
@@ -145,6 +147,8 @@ def renderability(exp, dataset, model, renderer,trajectory, device):
     outdir = join(exp, 'test', 'scale_{}'.format(scale))
     os.makedirs(join(outdir, 'gt'), exist_ok=True)
     os.makedirs(join(outdir, 'renders'), exist_ok=True)
+    os.makedirs(join(outdir, 'render_points'), exist_ok=True)
+    os.makedirs(join(outdir, 'target'), exist_ok=True)
     total_time = 0
 
     #计算
@@ -166,31 +170,195 @@ def renderability(exp, dataset, model, renderer,trajectory, device):
     #将给定的新的GPS坐标转换成colmap坐标
     # R0_colmap,T0_colmap=dataset.get_colmap_transform()
     R0_colmap,T0_colmap=dataset.get_colmap_transform()
-
+    center0=dataset.infos[0]['camera']['center']
+    R0=dataset.infos[0]['camera']['R']
+    T0=dataset.infos[0]['camera']['T']
     #暂时使用p2p测试
     GPS_target0,GPS_target1=trajectory.gen_camera_view()
-
+    #暂时规定两个视角高度均为38.0
+    GPS_target0[2]=GPS_target1[2]=38.0
     # bugs in the transformation
     colmap_target0=GPU_to_colmap(GPS_target0,R0_colmap,T0_colmap)
     colmap_target1=GPU_to_colmap(GPS_target1,R0_colmap,T0_colmap)
     target_center=colmap_target0
-    z_axis_vec=colmap_target1-colmap_target0
-    R=colmap_gen_R_xoy(z_axis_vec)
-    T=-np.dot(R,target_center)
-
-    #暂时使用原始内参进行测试
-    view = Camera_view.generate_from_coordinate(target_center,R,T,input_intri_dict=True,intri_dict=origin_intrinsic)
-    view_camera_feature=view.get_camera_feature()
+    z_axis_vec=(colmap_target1-colmap_target0)[0]
+    # R=np.dot(R0,colmap_gen_R_xoy(z_axis_vec))
+    # T=-np.dot(R,target_center.T)+T0
 
 
+    # #暂时使用原始内参进行测试
+    # view_test=dataset.infos[0]
+    # view_test['camera']['R']=np.ones(3)
+    # view_test['camera']['T']=np.zeros(3)
+    
 
-    while True:
-        pass
+    
+    R=np.eye(3)
+    T=np.dot(R,dataset.infos[0]['camera']['center'])
+    target_center=dataset.infos[0]['camera']['center']
+    view = Camera_view.generate_from_coordinate(target_center,R,T,input_intri_dict=True,intrinsic_feature=origin_intrinsic)
+    view_camera_feature=view.get_camera_feature_torch()
+
+
+    '''
+    在这里给出render ability的逻辑
+    dataset= init()
+    trajectory=init()
+
+    # range with the length of required points num
+    for i in tqdm(range(trajectory.get_render_points_num())): 
+        view_selection_list=trajectory.gen_selection_view(i)
+        views=[]
+        n_value=1
+        for view in view_selection_list:
+            views.append({
+                    'camera':view,
+                    'value_list':torch.zeros([n_value])
+                }
+            )
+        value_list=torch.zeros([len(selection_view_list),1]) 
+        for view_index,view in enumerate(views):
+            camera_feature=view['camera']
+            #这里是生成一个类似与dataset的新的变量，包含了一个子集
+            source_view_selection=dataset.select_view(camera_feature)
+            source_dataloader = torch.utils.data.DataLoader(source_view_selection, batch_size=1, shuffle=False, num_workers=0)
+            target_batch=batch_transform(camera_feature)
+            #render
+            target_render=renderer.vis(target_batch,model)
+
+            source_view_num=len(source_dataset.infos)
+            loss=0.0f
+            for batch_idx, batch in enumerate(source_dataloader):
+                # loss 放到model 中计算
+                output = renderer.vis(batch, model)
+                lossi+=loss_function()
+            value_list[view_index]=lossi/source_view_num
+        sort(view_selection_list)
+        trajectory.view()
+                
+
+
+            
+    '''
+    for batch_idx, batch in enumerate(tqdm(dataloader)):
+        batch_transformed=prepare_batch(view_camera_feature, device)
+        batch_source = prepare_batch(batch, device)
+        print('gen_batch')
+        # pass
+        with torch.no_grad():
+            torch.cuda.synchronize()
+            output = renderer.vis(batch_source, model)
+            torch.cuda.synchronize()
+        append_mask = False
+
+        # use foreground mask
+        if 'mask' in batch_source.keys():
+            mask = batch_source['mask'][0].cpu().numpy()
+            mask = (mask * 255).astype(np.uint8)
+            append_mask = True
+        if torch.is_tensor(batch['image'][0]):
+            gt = batch_source['image'][0].cpu().numpy()
+            gt = (gt[:,:,::-1] * 255).astype(np.uint8)
+            if append_mask:
+                gt = np.dstack([gt, mask[:, :, None]])
+            gt_name = join(outdir, 'gt', '%04d.png'%(batch_idx))
+            cv2.imwrite(gt_name, gt)
+        renders = output['render'][0].permute(1, 2, 0).cpu().numpy()
+        renders = (np.clip(renders[:, :,::-1], 0., 1.) * 255).astype(np.uint8)
+        if append_mask:
+            renders = np.dstack([renders, mask[:, :, None]])
+        render_name = join(outdir, 'renders', '%04d.png'%(batch_idx))
+        cv2.imwrite(render_name, renders)
+
+        reders_points=renderer.marigold_depth_vis(output['point_weight_pixel'][0])
+        render_points_name = join(outdir, 'render_points', '%04d.png'%(batch_idx))
+        cv2.imwrite(render_points_name, reders_points)
+
+
+    # render source and target view
+    # for batch_idx, batch in enumerate(tqdm(dataloader)):
+    #     batch_transformed=prepare_batch(view_camera_feature, device)
+    #     batch_source = prepare_batch(batch, device)
+    #     print('gen_batch')
+    #     # pass
+    #     with torch.no_grad():
+    #         # start = torch.cuda.Event(enable_timing=True)
+    #         # end = torch.cuda.Event(enable_timing=True)
+    #         torch.cuda.synchronize()
+    #         # start.record()
+    #         output = renderer.vis(batch_source, model)
+    #         torch.cuda.synchronize()
+    #         # end.record()
+    #     # total_time += start.elapsed_time(end)
+    #     append_mask = False
+    #     # use foreground mask
+    #     if 'mask' in batch_source.keys():
+    #         mask = batch_source['mask'][0].cpu().numpy()
+    #         mask = (mask * 255).astype(np.uint8)
+    #         append_mask = True
+    #     if torch.is_tensor(batch['image'][0]):
+    #         gt = batch_source['image'][0].cpu().numpy()
+    #         gt = (gt[:,:,::-1] * 255).astype(np.uint8)
+    #         if append_mask:
+    #             gt = np.dstack([gt, mask[:, :, None]])
+    #         gt_name = join(outdir, 'gt', '%04d.png'%(batch_idx))
+    #         cv2.imwrite(gt_name, gt)
+    #     renders = output['render'][0].permute(1, 2, 0).cpu().numpy()
+    #     renders = (np.clip(renders[:, :,::-1], 0., 1.) * 255).astype(np.uint8)
+    #     if append_mask:
+    #         renders = np.dstack([renders, mask[:, :, None]])
+    #     render_name = join(outdir, 'renders', '%04d.png'%(batch_idx))
+    #     cv2.imwrite(render_name, renders)
+
+    #     reders_points=renderer.marigold_depth_vis(output['point_weight_pixel'][0])
+    #     render_points_name = join(outdir, 'render_points', '%04d.png'%(batch_idx))
+    #     cv2.imwrite(render_points_name, reders_points)
+
+    #     #target render
+    #     with torch.no_grad():
+    #         # start = torch.cuda.Event(enable_timing=True)
+    #         # end = torch.cuda.Event(enable_timing=True)
+    #         torch.cuda.synchronize()
+    #         # start.record()
+    #         output_target = renderer.vis(batch_transformed, model)
+    #         torch.cuda.synchronize()
+    #         # end.record()
+    #     # total_time += start.elapsed_time(end)
+    #     # append_mask = False
+    #     # use foreground mask
+    #     # if 'mask' in batch.keys():
+    #     #     mask = batch['mask'][0].cpu().numpy()
+    #     #     mask = (mask * 255).astype(np.uint8)
+    #     #     append_mask = True
+    #     # if torch.is_tensor(batch['image'][0]):
+    #     #     gt = batch['image'][0].cpu().numpy()
+    #     #     gt = (gt[:,:,::-1] * 255).astype(np.uint8)
+    #     #     if append_mask:
+    #     #         gt = np.dstack([gt, mask[:, :, None]])
+    #     #     gt_name = join(outdir, 'gt', '%04d.png'%(batch_idx))
+    #     #     cv2.imwrite(gt_name, gt)
+    #     renders = output_target['render'][0].permute(1, 2, 0).cpu().numpy()
+    #     renders = (np.clip(renders[:, :,::-1], 0., 1.) * 255).astype(np.uint8)
+    #     if append_mask:
+    #         renders = np.dstack([renders, mask[:, :, None]])
+    #     render_name = join(outdir, 'target', '%04d.png'%(batch_idx))
+    #     cv2.imwrite(render_name, renders)
+
+    #     # reders_points=renderer.marigold_depth_vis(output['point_weight_pixel'][0])
+    #     # render_points_name = join(outdir, 'render_points', '%04d.png'%(batch_idx))
+    #     # cv2.imwrite(render_points_name, reders_points)
+    #     break
+    # print('scale: {}, Average time: {:.2f} ms, fps: {:.1f}'.format(scale, total_time / len(dataloader), 1000 / (total_time / len(dataloader))))
+
+    # while True:
+    #     pass
         
 
 
     # for batch_idx, batch in enumerate(tqdm(dataloader)):
-    #     batch = prepare_batch(batch, device)
+    #     batch_pre = prepare_batch(batch, device)
+    #     print('gen_batch')
+    #     pass
     #     with torch.no_grad():
     #         start = torch.cuda.Event(enable_timing=True)
     #         end = torch.cuda.Event(enable_timing=True)

@@ -261,6 +261,10 @@ class LoG(nn.Module):
         return self.gaussian.visibility_flag
 
     def get_all(self, camera, rasterizer):
+        '''
+        提取出所有可视的primitive
+        '''
+
         visible_index = self.gaussian.visibility_flag['index']
         # This design optimize the node either
         if self.fix_parent:
@@ -569,6 +573,7 @@ class LoG(nn.Module):
         # handle the shape mismatch problem
         if split == 'train':
             self.training_setup()
+        
         # directly replace the tensor
         for key, val in state_dict.items():
             if split != 'train' and 'optimizer' in key:

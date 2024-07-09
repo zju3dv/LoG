@@ -10,6 +10,8 @@ from .camera_utils import get_center_and_diag
 from .gps import GPS_dataset
 from .camera_utils import get_colmap_transform
 
+def batch_transform():
+    pass
 
 def read_undistort_rescale_write(info):
     flag_read_img = False

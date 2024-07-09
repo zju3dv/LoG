@@ -12,8 +12,8 @@ class GPS_Position:
         lon -- 经度
         alt -- 高度
         """
-        self.lat = lat
-        self.lon = lon  
+        self.lat = lon
+        self.lon = lat  
         self.alt = alt
     
     def __sub__(self,others):
@@ -36,7 +36,7 @@ class GPS_Position:
         返回:
         位置数据
         """
-        return [self.lat, self.lon, self.alt]
+        return [self.lon, self.lat, self.alt]
 
     @staticmethod
     def cal_distance_np(pos1,pos2):
@@ -83,10 +83,10 @@ class GPS_dataset():
             positions=[]
             for node in photo_node:
                 GPS_node=node.getElementsByTagName('GPS')
-                lat=float(GPS_node[0].getElementsByTagName('Latitude')[0].firstChild.data)
                 lon=float(GPS_node[0].getElementsByTagName('Longitude')[0].firstChild.data)
+                lat=float(GPS_node[0].getElementsByTagName('Latitude')[0].firstChild.data)
                 alt=float(GPS_node[0].getElementsByTagName('Altitude')[0].firstChild.data)
-                positions.append(GPS_Position(lat,lon,alt))
+                positions.append(GPS_Position(lon,lat,alt))
         return positions
     
     def read_from_cache(self,cache_path):
@@ -102,8 +102,8 @@ class GPS_dataset():
         positions = []
         with open(cache_path,'r',encoding='utf-8') as f:
             for line in f:
-                lat, lon, alt = map(float, line.strip().split(','))
-                positions.append(GPS_Position(lat, lon, alt))
+                lon, lat, alt = map(float, line.strip().split(','))
+                positions.append(GPS_Position(lon, lat, alt))
         return positions
 
     def write_cache(self,cache_path):
@@ -115,7 +115,7 @@ class GPS_dataset():
         """
         with open(cache_path,'w',encoding='utf-8') as f:
             for position in self.positions:
-                f.write(f"{position.lat},{position.lon},{position.alt}\n")
+                f.write(f"{position.lon},{position.lat},{position.alt}\n")
 
 
     

@@ -1,4 +1,5 @@
-from diff_gaussian_rasterization_wodilate import GaussianRasterizationSettings, GaussianRasterizer
+# from diff_gaussian_rasterization_wodilate import GaussianRasterizationSettings, GaussianRasterizer
+from alpha_gaussian_rasterization_wodilate import GaussianRasterizationSettings, GaussianRasterizer
 import math
 import os
 import time
@@ -74,6 +75,7 @@ class BaseRender(torch.nn.Module):
             prefiltered=False,
             debug=False
         )
+
         rasterizer = BaseRender.GaussianRasterizer(raster_settings=raster_settings)
         return rasterizer
 
@@ -100,8 +102,12 @@ class NaiveRendererAndLoss(BaseRender):
             from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
             BaseRender.GaussianRasterizationSettings = GaussianRasterizationSettings
             BaseRender.GaussianRasterizer = GaussianRasterizer
+        # else:
+        #     from diff_gaussian_rasterization_wodilate import GaussianRasterizationSettings, GaussianRasterizer
+        #     BaseRender.GaussianRasterizationSettings = GaussianRasterizationSettings
+        #     # BaseRender.GaussianRasterizer = GaussianRasterizer
         else:
-            from diff_gaussian_rasterization_wodilate import GaussianRasterizationSettings, GaussianRasterizer
+            from alpha_gaussian_rasterization_wodilate import GaussianRasterizationSettings, GaussianRasterizer
             BaseRender.GaussianRasterizationSettings = GaussianRasterizationSettings
             BaseRender.GaussianRasterizer = GaussianRasterizer
         self.use_origin_render = use_origin_render
@@ -163,6 +169,7 @@ class NaiveRendererAndLoss(BaseRender):
             name_args['use_filter'] = False
         # 渲染图像的地方
         ret = rasterizer(**name_args)
+        # ret = rasterizer()
         # radii ?  这里的point_id_pixel出现了重复
         if len(ret) == 5:
             rendered_image, radii, point_id_pixel, point_weight_pixel, point_weight = ret
@@ -249,15 +256,48 @@ class NaiveRendererAndLoss(BaseRender):
                     # random_log2: (0, 0.5) => (0, 1) => (1, 2)
                     pixel_radius = 3 * 2 ** (random_log2 * 2)
                 model.tree.min_resolution_pixel = pixel_radius
+            #这里做了modelproimitive的预选择
             model.prepare(rasterizer, camera)
             #在这里，camara对应一个图片的信息，rasterizer对应一个相机的参数，model对应当前所有primitive
             #render_pkg 为模型输出数据 ，model_data 为模型输入数据
             render_pkg, model_data = self.render(camera, rasterizer, model)
             if model.training and self.use_rand_radius:
                 model.tree.min_resolution_pixel = origin_radius
-            if getattr(model, 'view_correction', None) is not None and model.training:
-                view_correction = model.view_correction[batch['index'][bn].item()]
-                render_pkg['render_correct'] = render_pkg['render'] * view_correction[:, None, None]
+            # if getattr(model, 'view_correction', None) is not None:
+            # if getattr(model, 'view_correction', None) is not None and model.training:
+            #     view_correction = model.view_correction[batch['index'][bn].item()]
+                # render_pkg['render_correct'] = render_pkg['render'] * view_correction[:, None, None]
+            for key, val in render_pkg.items():
+                preds[key].append(val)
+        for key in ['render', 'render_correct', 'render_max']:
+            if key in preds.keys():
+                preds[key] = torch.stack(preds[key])
+        return preds
+    
+    def sample(self, batch, model, background=None):
+        preds = defaultdict(list)
+        for bn in range(batch['camera']['camera_center'].shape[0]):
+            camera, rasterizer, background = self.prepare_camera(batch, bn, background, is_train=model.training)
+            if model.training and self.use_rand_radius:
+                origin_radius = model.tree.min_resolution_pixel
+                random_log2 = torch.rand(1).item()
+                if random_log2 > 0.5:
+                    # random_log2: (0.5, 1) => (1, 5) => (2, 32)
+                    pixel_radius = 3 * 2 ** (random_log2 * 8 - 3)
+                else:
+                    # random_log2: (0, 0.5) => (0, 1) => (1, 2)
+                    pixel_radius = 3 * 2 ** (random_log2 * 2)
+                model.tree.min_resolution_pixel = pixel_radius
+            model.prepare(rasterizer, camera)
+            #在这里，camara对应一个图片的信息，rasterizer对应一个相机的参数，model对应当前所有primitive
+            #render_pkg 为模型输出数据 ，model_data 为模型输入数据
+            render_pkg, model_data = self.render(camera, rasterizer, model)
+            if model.training and self.use_rand_radius:
+                model.tree.min_resolution_pixel = origin_radius
+            # if getattr(model, 'view_correction', None) is not None:
+            # if getattr(model, 'view_correction', None) is not None and model.training:
+            #     view_correction = model.view_correction[batch['index'][bn].item()]
+                # render_pkg['render_correct'] = render_pkg['render'] * view_correction[:, None, None]
             for key, val in render_pkg.items():
                 preds[key].append(val)
         for key in ['render', 'render_correct', 'render_max']:

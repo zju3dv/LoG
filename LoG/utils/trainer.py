@@ -38,6 +38,7 @@ def prepare_batch(data, device):
                 elif torch.is_tensor(val[camk]):
                     val[camk] = val[camk].float().to(device)
                 else:
+                    continue
                     import ipdb; ipdb.set_trace()
             batch[key] = val
         elif torch.is_tensor(val):
