@@ -151,53 +151,43 @@ def renderability(exp, dataset, model, renderer,trajectory, device):
     os.makedirs(join(outdir, 'target'), exist_ok=True)
     total_time = 0
 
-    #计算
-    # pos0_col=dataset.infos[0]['camera']['camera_center']
-    # pos1_col=dataset.infos[1]['camera']['camera_center']
-    # R0_col=dataset.infos[0]['camera']['R']
-    # R1_col=dataset.infos[1]['camera']['R']
-    # R0_gps=dataset.infos[0]['gps']
-    # R1_gps=dataset.infos[1]['gps']
-    # unit_length=R0_gps-R1_gps
-    # t1=pos1_col-pos0_col
-    # z1_col=t1/np.linalg.norm(t1)
-    # R1=gen_R_xoy(z1_col)
-
-    # 内参使用第一帧数据
-    origin_intrinsic=dataset.get_origin_intrinsic_feature()
+    
+    # 新的视角生成
+    # # 内参使用第一帧数据
+    # origin_intrinsic=dataset.get_origin_intrinsic_feature()
 
 
-    #将给定的新的GPS坐标转换成colmap坐标
+    # #将给定的新的GPS坐标转换成colmap坐标
+    # # R0_colmap,T0_colmap=dataset.get_colmap_transform()
     # R0_colmap,T0_colmap=dataset.get_colmap_transform()
-    R0_colmap,T0_colmap=dataset.get_colmap_transform()
-    center0=dataset.infos[0]['camera']['center']
-    R0=dataset.infos[0]['camera']['R']
-    T0=dataset.infos[0]['camera']['T']
-    #暂时使用p2p测试
-    GPS_target0,GPS_target1=trajectory.gen_camera_view()
-    #暂时规定两个视角高度均为38.0
-    GPS_target0[2]=GPS_target1[2]=38.0
-    # bugs in the transformation
-    colmap_target0=GPU_to_colmap(GPS_target0,R0_colmap,T0_colmap)
-    colmap_target1=GPU_to_colmap(GPS_target1,R0_colmap,T0_colmap)
-    target_center=colmap_target0
-    z_axis_vec=(colmap_target1-colmap_target0)[0]
-    # R=np.dot(R0,colmap_gen_R_xoy(z_axis_vec))
-    # T=-np.dot(R,target_center.T)+T0
+    # center0=dataset.infos[0]['camera']['center']
+    # R0=dataset.infos[0]['camera']['R']
+    # T0=dataset.infos[0]['camera']['T']
+    # #暂时使用p2p测试
+    # GPS_target0,GPS_target1=trajectory.gen_camera_view()
+    # #暂时规定两个视角高度均为38.0
+    # GPS_target0[2]=GPS_target1[2]=38.0
+    # # bugs in the transformation
+    # colmap_target0=GPU_to_colmap(GPS_target0,R0_colmap,T0_colmap)
+    # colmap_target1=GPU_to_colmap(GPS_target1,R0_colmap,T0_colmap)
+    # target_center=colmap_target0
+    # z_axis_vec=(colmap_target1-colmap_target0)[0]
+    # # R=np.dot(R0,colmap_gen_R_xoy(z_axis_vec))
+    # # T=-np.dot(R,target_center.T)+T0
 
 
-    # #暂时使用原始内参进行测试
-    # view_test=dataset.infos[0]
-    # view_test['camera']['R']=np.ones(3)
-    # view_test['camera']['T']=np.zeros(3)
+    # # #暂时使用原始内参进行测试
+    # # view_test=dataset.infos[0]
+    # # view_test['camera']['R']=np.ones(3)
+    # # view_test['camera']['T']=np.zeros(3)
     
 
     
-    R=np.eye(3)
-    T=np.dot(R,dataset.infos[0]['camera']['center'])
-    target_center=dataset.infos[0]['camera']['center']
-    view = Camera_view.generate_from_coordinate(target_center,R,T,input_intri_dict=True,intrinsic_feature=origin_intrinsic)
-    view_camera_feature=view.get_camera_feature_torch()
+    # R=np.eye(3)
+    # T=np.dot(R,dataset.infos[0]['camera']['center'])
+    # target_center=dataset.infos[0]['camera']['center']
+    # view = Camera_view.generate_from_coordinate(target_center,R,T,input_intri_dict=True,intrinsic_feature=origin_intrinsic)
+    # view_camera_feature=view.get_camera_feature_torch()
 
 
     '''
@@ -235,13 +225,11 @@ def renderability(exp, dataset, model, renderer,trajectory, device):
             value_list[view_index]=lossi/source_view_num
         sort(view_selection_list)
         trajectory.view()
-                
-
-
-            
     '''
+
+
     for batch_idx, batch in enumerate(tqdm(dataloader)):
-        batch_transformed=prepare_batch(view_camera_feature, device)
+        # batch_transformed=prepare_batch(view_camera_feature, device)
         batch_source = prepare_batch(batch, device)
         print('gen_batch')
         # pass

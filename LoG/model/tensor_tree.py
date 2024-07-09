@@ -130,6 +130,9 @@ class TensorTree(nn.Module):
 
     @torch.no_grad()
     def _query_tree_torch(self, model, index, camera, min_resolution_pixel, max_depth):
+        '''
+        选取优化目标child 节点index
+        '''
         indices_list = []
         level = 1
         while True:
@@ -180,6 +183,7 @@ class TensorTree(nn.Module):
                             min_resolution_pixel=self.min_resolution_pixel, max_depth=max_depth)
         index_list = [index_root_keep, index_child]
         index_concat = torch.cat(index_list, dim=0)
+        #最终得到需要进一步优化的root，child的indexlist
         depth = self.depth[index_concat].float().mean()
         if self.log_query:
             print(f' query mean depth: {depth}')

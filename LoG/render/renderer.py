@@ -256,7 +256,7 @@ class NaiveRendererAndLoss(BaseRender):
                     # random_log2: (0, 0.5) => (0, 1) => (1, 2)
                     pixel_radius = 3 * 2 ** (random_log2 * 2)
                 model.tree.min_resolution_pixel = pixel_radius
-            #这里做了modelproimitive的预选择
+            #这里做了modelproimitive的预选择，选择了所有待优化的primitiveindex
             model.prepare(rasterizer, camera)
             #在这里，camara对应一个图片的信息，rasterizer对应一个相机的参数，model对应当前所有primitive
             #render_pkg 为模型输出数据 ，model_data 为模型输入数据
@@ -294,10 +294,6 @@ class NaiveRendererAndLoss(BaseRender):
             render_pkg, model_data = self.render(camera, rasterizer, model)
             if model.training and self.use_rand_radius:
                 model.tree.min_resolution_pixel = origin_radius
-            # if getattr(model, 'view_correction', None) is not None:
-            # if getattr(model, 'view_correction', None) is not None and model.training:
-            #     view_correction = model.view_correction[batch['index'][bn].item()]
-                # render_pkg['render_correct'] = render_pkg['render'] * view_correction[:, None, None]
             for key, val in render_pkg.items():
                 preds[key].append(val)
         for key in ['render', 'render_correct', 'render_max']:

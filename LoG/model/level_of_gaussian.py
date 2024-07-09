@@ -262,7 +262,7 @@ class LoG(nn.Module):
 
     def get_all(self, camera, rasterizer):
         '''
-        提取出所有可视的primitive
+        把需要优化的node 转换成可优化变量
         '''
 
         visible_index = self.gaussian.visibility_flag['index']
