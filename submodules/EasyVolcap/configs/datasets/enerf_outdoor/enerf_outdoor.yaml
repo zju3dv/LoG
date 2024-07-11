@@ -1,0 +1,46 @@
+dataloader_cfg: # we see the term "dataloader" as one word?
+    dataset_cfg: &dataset_cfg
+        masks_dir: bgmtv2
+        bounds: [[-3.0, -3.0, -2.0], [3.0, 3.0, 2.0]] # thinner?
+
+        dist_opt_K: True
+        near: 3.5
+        far: 9.0
+
+        vhull_thresh: 1.0 # 18 cameras?
+        count_thresh: 18 # common views
+        vhull_padding: 0.02 # padding could just be larger, this should be mostly fine
+
+        vhull_ctof_factor: 3.0 # larger size?
+        vhull_thresh_factor: 1.0
+        vhull_count_factor: 1.0
+        coarse_discard_masks: False
+        intersect_camera_bounds: False
+
+        use_aligned_cameras: True # will center the bounding box
+        force_sparse_view: True # the user will specify the view count
+        view_sample: [0, 18, 1]
+        frame_sample: [0, 200, 1] # only train for a thousand frames
+        focal_ratio: 1.2
+
+val_dataloader_cfg:
+    dataset_cfg:
+        <<: *dataset_cfg
+
+runner_cfg:
+    visualizer_cfg:
+        video_fps: 60 # this dataset id built differently
+
+viewer_cfg:
+    camera_cfg:
+        # prettier-ignore
+        K: [[1639.199951171875,0.0,683.0],[0.0,1639.199951171875,384.0],[0.0,0.0,1.0]]
+        # prettier-ignore
+        R: [[0.8829049468040466,-0.46955186128616333,0.0],[-0.005646302364766598,-0.010616821236908436,-0.9999276995658875],[0.46951788663864136,0.8828410506248474,-0.012024874798953533]]
+        # prettier-ignore
+        T: [[-0.14367961883544922],[0.0021661361679434776],[5.292649269104004]]
+        n: 4.0
+        f: 9.0
+        bounds: [[-4.0,-4.0,-2.0],[4.0,4.0,2.0]]
+# {"H":768,"W":1366,"K":[[1639.199951171875,0.0,683.0],[0.0,1639.199951171875,384.0],[0.0,0.0,1.0]],"R":[[0.8829049468040466,-0.46955186128616333,0.0],[-0.005646302364766598,-0.010616821236908436,-0.9999276995658875],[0.46951788663864136,0.8828410506248474,-0.012024874798953533]],"T":[[-0.14367961883544922],[0.0021661361679434776],[5.292649269104004]],"n":4.0,"f":9.0,"t":0.0,"v":0.0,"bounds":[[-4.0,-4.0,-2.0],[4.0,4.0,2.0]],"mass":0.10000000149011612,"moment_of_inertia":0.10000000149011612,"movement_force":1.0,"movement_torque":1.0,"movement_speed":1.0,"origin":[0.0,0.0,0.0],"world_up":[0.0,0.0,1.0]}
+# {"H":768,"W":1366,"K":[[4373.33447265625,0.0,1822.22265625],[0.0,4373.33447265625,1024.5],[0.0,0.0,1.0]],"R":[[0.8829049468040466,-0.46955186128616333,0.0],[-0.005646302364766598,-0.010616821236908436,-0.9999276995658875],[0.46951788663864136,0.8828410506248474,-0.012024874798953533]],"T":[[-0.14367961883544922],[0.0021661361679434776],[5.292649269104004]],"n":4.0,"f":9.0,"t":0.0,"v":0.0,"bounds":[[-1.0,-1.0,-1.0],[1.0,1.0,1.0]],"mass":0.10000000149011612,"moment_of_inertia":0.10000000149011612,"movement_force":1.0,"movement_torque":1.0,"movement_speed":1.0,"origin":[0.0,0.0,0.0],"world_up":[0.0,0.0,1.0]}

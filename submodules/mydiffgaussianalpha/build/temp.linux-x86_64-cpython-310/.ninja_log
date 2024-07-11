@@ -1,0 +1,6 @@
+# ninja log v5
+1	3058	1717754473396665208	/root/repository/project/sci/test_log/LoG/submodules/mydiffgaussian/build/temp.linux-x86_64-cpython-310/cuda_rasterizer/forward.o	5634fb822a9e94bd
+1	3096	1717754473432664045	/root/repository/project/sci/test_log/LoG/submodules/mydiffgaussian/build/temp.linux-x86_64-cpython-310/cuda_rasterizer/backward.o	2744f1ac385eddc1
+1	9638	1717754479972453419	/root/repository/project/sci/test_log/LoG/submodules/mydiffgaussian/build/temp.linux-x86_64-cpython-310/cuda_rasterizer/rasterizer_impl.o	4bacb8a83ed4d90c
+1	14983	1717754485312282572	/root/repository/project/sci/test_log/LoG/submodules/mydiffgaussian/build/temp.linux-x86_64-cpython-310/ext.o	ab72c3bd2d28227a
+2	41211	1717754511539457727	/root/repository/project/sci/test_log/LoG/submodules/mydiffgaussian/build/temp.linux-x86_64-cpython-310/rasterize_points.o	320e9ee59d910b9c

@@ -1,0 +1,5 @@
+model_cfg:
+    sampler_cfg:
+        bg_brightness: 1.0
+    renderer_cfg:
+        bg_brightness: 1.0

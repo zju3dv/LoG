@@ -1,0 +1,37 @@
+torch>=2.1.0 # if you've used environment.yml, this will be a no-op
+av
+tqdm
+pdbr
+h5py
+yapf
+ujson
+regex; sys_platform=='win32'
+PyGLM
+scipy
+numpy
+addict
+PyYaml
+ipython
+trimesh
+imageio
+PyMCubes
+pypiwin32; sys_platform=='win32'
+pyperclip
+pyntcloud
+torchaudio
+websockets
+torchvision
+PyTurboJPEG
+tensorboard
+ruamel.yaml
+cuda-python; sys_platform!='darwin'
+scikit-image
+imgui-bundle
+opencv-python
+
+# Stupid PyTorch CUDA extension building... Unable to ensure pytorch is installed before the building happens...
+# tinycudann @ git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
+# simple_knn @ git+https://gitlab.inria.fr/bkerbl/simple-knn
+# diff_gauss @ git+https://github.com/dendenxu/diff-gaussian-rasterization
+# diff_point_rasterization @ git+https://github.com/dendenxu/diff-point-rasterization
+# diff_gaussian_rasterization @ git+https://github.com/graphdeco-inria/diff-gaussian-rasterization

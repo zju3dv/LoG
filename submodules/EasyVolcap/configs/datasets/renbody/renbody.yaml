@@ -1,0 +1,26 @@
+dataloader_cfg: # we see the term "dataloader" as one word?
+    dataset_cfg: &dataset_cfg
+        masks_dir: masks # {data_root}/{masks_dir,images_dir}/{camera_name}/000000{.jpg,.png}
+        # prettier-ignore
+        ratio: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6] # a single float or a list of floats corresponding to every camera
+        bounds: [[-5.0, -5.0, -5.0], [5.0, 5.0, 5.0]] # thinner?
+        dist_opt_K: false # whether to resize the image so that after distortion, no black pixels will remain
+        use_aligned_cameras: True # whether to move the center of the attention of the cameras to the world origin
+        view_sample: [0, 60, 1] # start, end, step. 0 means the first view, null means the last view
+        frame_sample: [0, 150, 1] # start, end, step. 0 means the first frame, null means the last frame
+
+model_cfg:
+    sampler_cfg:
+        bg_brightness: 0.0
+    renderer_cfg:
+        bg_brightness: 0.0
+
+val_dataloader_cfg:
+    dataset_cfg:
+        <<: *dataset_cfg
+        frame_sample: [0, 150, 30] # make rendering faster, controls which of the views and frames to load
+    sampler_cfg:
+        view_sample: [0, 60, 20] # make rendering faster, if doing IBR, change the view_sample in sampler_cfg to control which view to render
+
+viewer_cfg:
+    use_window_focal: True # when initializing viewer, use window H and W to calculate focal to give a better experience

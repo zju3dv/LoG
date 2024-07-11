@@ -1,0 +1,64 @@
+dataloader_cfg:
+    dataset_cfg: &dataset_cfg
+        cache_raw: False
+        n_rays: 1024
+        near: 0.5
+    batch_sampler_cfg:
+        batch_size: 16 # will sample from all images (this should be only used for static scenes)
+    num_workers: 16
+
+val_dataloader_cfg:
+    num_workers: 4
+    dataset_cfg:
+        <<: *dataset_cfg
+
+runner_cfg:
+    epochs: 60 # enough is enough
+    log_interval: 10
+    eval_ep: 5
+    save_ep: 5
+    save_latest_ep: 5
+    train_use_amp: True # faster training available for this
+    optimizer_cfg:
+        lr: 5.0e-3
+        eps: 1.0e-15
+        weight_decay_table:
+            xyzt_embedder: 1.0e-6
+
+_: &mlp_size # skip_geo_feat: True
+    type: VolumetricVideoNetwork
+    geometry_cfg:
+        width: 64
+        depth: 1
+        splits: [1, 15]
+    appearance_cfg:
+        width: 32
+        depth: 2
+    xyzt_embedder_cfg:
+        type: KPlanesEmbedder
+
+# Always define full model config
+model_cfg:
+    # render_chunk_size: 32768
+    network_cfg:
+        <<: *mlp_size
+        type: MultilevelNetwork
+        network_cfgs:
+            '0': # coarse network config
+                xyzt_embedder_cfg:
+                    n_levels: 1
+                    n_features_per_level: 8
+                    base_resolution: 128
+                <<: *mlp_size
+            '1': # coarse network config
+                xyzt_embedder_cfg:
+                    n_levels: 2
+                    n_features_per_level: 8
+                    base_resolution: 256
+                <<: *mlp_size
+            '2': # fine network config
+                xyzt_embedder_cfg:
+                    n_levels: 4
+                    n_features_per_level: 8
+                    base_resolution: 512
+                <<: *mlp_size

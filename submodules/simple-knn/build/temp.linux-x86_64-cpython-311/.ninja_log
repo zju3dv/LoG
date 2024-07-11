@@ -1,0 +1,4 @@
+# ninja log v5
+0	10190	1717686051795667159	/root/repository/project/sci/test_l,og (copy)/LoG/submodules/simple-knn/build/temp.linux-x86_64-cpython-311/simple_knn.o	588c0dd71bd65d6f
+0	15838	1717686057443596192	/root/repository/project/sci/test_l,og (copy)/LoG/submodules/simple-knn/build/temp.linux-x86_64-cpython-311/ext.o	eb797873d18e3f62
+0	46217	1717686087815213947	/root/repository/project/sci/test_l,og (copy)/LoG/submodules/simple-knn/build/temp.linux-x86_64-cpython-311/spatial.o	a435c6c28dfa3ffe

@@ -1,0 +1,101 @@
+_: &mlp_size # skip_geo_feat: True
+    dir_embedder_cfg:
+        type: TcnnDirEmbedder
+    xyzt_embedder_cfg:
+        xyz_embedder_cfg:
+            type: TcnnHashEmbedder # no mipnerf360 contraction
+        t_embedder_cfg:
+            out_dim: 8 # smaller latent code
+
+dataloader_cfg:
+    dataset_cfg: &dataset_cfg
+        cache_raw: True
+        n_rays: 1024
+        near: 0.5
+    batch_sampler_cfg:
+        batch_size: 16 # will sample from all images (this should be only used for static scenes)
+    num_workers: 16
+
+val_dataloader_cfg:
+    num_workers: 4
+    dataset_cfg:
+        <<: *dataset_cfg
+
+runner_cfg:
+    epochs: 50
+    ep_iter: &ep_iter 1000
+    optimizer_cfg:
+        lr: 5.0e-4
+        eps: 1.0e-15
+    scheduler_cfg:
+        type: ExponentialLR
+        gamma: 0.1
+        min_lr: 1.0e-6
+
+# Always define full model config
+model_cfg:
+    train_chunk_size: 8192
+    render_chunk_size: 8192
+    supervisor_cfg:
+        dist_loss_weight: 0.0
+        eikonal_loss_weight: 0.1
+        curvature_loss_weight: 0.0
+    network_cfg:
+        <<: *mlp_size
+        network_cfgs:
+            '0':
+                type: VolumetricVideoNetwork
+                xyzt_embedder_cfg:
+                    xyz_embedder_cfg:
+                        n_levels: 12 # smaller base hash resolution
+                        log2_hashmap_size: 17 # smaller base hash resolution
+                geometry_cfg:
+                    width: 16
+                    depth: 0
+                    splits: [1, 0]
+                appearance_cfg:
+                    type: EmptyRegressor
+                dir_embedder_cfg:
+                    type: EmptyEmbedder
+                <<: *mlp_size
+
+            '1':
+                type: VolumetricVideoNetwork
+                xyzt_embedder_cfg:
+                    xyz_embedder_cfg:
+                        n_levels: 14 # smaller base hash resolution
+                        log2_hashmap_size: 17 # smaller base hash resolution
+                geometry_cfg:
+                    width: 16
+                    depth: 0
+                    splits: [1, 0]
+                appearance_cfg:
+                    type: EmptyRegressor
+                dir_embedder_cfg:
+                    type: EmptyEmbedder
+                <<: *mlp_size
+            '2':
+                type: VolSDFNetwork
+                xyzt_embedder_cfg:
+                    xyz_embedder_cfg:
+                        log2_hashmap_size: 21 # smaller base hash resolution
+                        interpolation: Linear
+                xyz_embedder_cfg:
+                    type: EmptyEmbedder
+                geometry_cfg:
+                    type: SDFRegressor
+                    width: 64
+                    depth: 1
+                    splits: [1, 15]
+                    bias: 0.5
+                appearance_cfg:
+                    type: ColorRegressor
+                    width: 64
+                    depth: 2
+                use_finite_diff: False
+                use_finite_diff_schedule: False
+                use_hash_encoding_schedule: False
+                level_init: 4
+                steps_per_level: *ep_iter
+                use_curvature_loss_weight_schedule: False
+                <<: *mlp_size
