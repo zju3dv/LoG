@@ -218,7 +218,7 @@ class LoG(nn.Module):
             scales = scaling,
             rotations = rotation,
             cov3D_precomp = None)
-        rendered_image, radii, point_id_pixel, point_weight_pixel, point_weight = ret
+        rendered_image, radii, point_id_pixel, point_weight_pixel, point_weight,range_size, geombuffer, binningbuffer, imgbuffer = ret
         return point_weight
         
     def prepare(self, rasterizer, camera):
@@ -232,7 +232,7 @@ class LoG(nn.Module):
             root_index_in_range = root_index[valid_root_flag]
             # render and check the weight
             opacity = self.gaussian.activation.opacity_activation(self.gaussian.opacity)
-            use_visibility_check = True
+            use_visibility_check = False
             if use_visibility_check:
                 scaling = self.gaussian.activation.scaling_activation(self.gaussian.scaling)
                 rotation = self.gaussian.activation.rotation_activation(self.gaussian.rotation)

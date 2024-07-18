@@ -9,6 +9,7 @@ from LoG.trajectory.camera_view import Camera_view
 from LoG.trajectory.utils import GPU_to_colmap,colmap_gen_R_xoy
 from LoG.dataset.camera_utils import get_colmap_transform
 from LoG.dataset.colmap import batch_transform
+from LoG.analysis.analyze import histogram_analysis
 import cv2
 import torch
 import wandb
@@ -235,9 +236,42 @@ def renderability(exp, dataset, model, renderer,trajectory, device):
         # pass
         with torch.no_grad():
             torch.cuda.synchronize()
-            output = renderer.vis(batch_source, model)
+            # output = renderer.vis(batch_source, model)
+            output = renderer.sample(batch_source, model)
             torch.cuda.synchronize()
         append_mask = False
+
+        # range_size analysis
+        np_range_size=output['range_size'][0].cpu().numpy().reshape(-1,)
+        histogram_analysis(np_range_size,'range_size',batch_idx)
+
+        # get the max depth
+        fatherest_depth_index=output['ranges'][0].cpu().numpy()[:,:,1].reshape(-1,)-1
+        #use fatherest_depth_index as index to access the output['depth'][0]
+        depth = output['point_depth'][0].cpu().numpy()
+        depth = depth.reshape(-1)
+        selected_depth = depth[fatherest_depth_index]
+        histogram_analysis(selected_depth,'max_depth',batch_idx)
+
+        #analysis the depth
+        np_range_size=output['point_depth'][0].cpu().numpy().reshape(-1,)
+        histogram_analysis(np_range_size,'depth',batch_idx)
+
+
+
+
+
+        
+
+
+
+
+
+
+
+
+
+
 
         # use foreground mask
         if 'mask' in batch_source.keys():
@@ -263,119 +297,6 @@ def renderability(exp, dataset, model, renderer,trajectory, device):
         cv2.imwrite(render_points_name, reders_points)
 
 
-    # render source and target view
-    # for batch_idx, batch in enumerate(tqdm(dataloader)):
-    #     batch_transformed=prepare_batch(view_camera_feature, device)
-    #     batch_source = prepare_batch(batch, device)
-    #     print('gen_batch')
-    #     # pass
-    #     with torch.no_grad():
-    #         # start = torch.cuda.Event(enable_timing=True)
-    #         # end = torch.cuda.Event(enable_timing=True)
-    #         torch.cuda.synchronize()
-    #         # start.record()
-    #         output = renderer.vis(batch_source, model)
-    #         torch.cuda.synchronize()
-    #         # end.record()
-    #     # total_time += start.elapsed_time(end)
-    #     append_mask = False
-    #     # use foreground mask
-    #     if 'mask' in batch_source.keys():
-    #         mask = batch_source['mask'][0].cpu().numpy()
-    #         mask = (mask * 255).astype(np.uint8)
-    #         append_mask = True
-    #     if torch.is_tensor(batch['image'][0]):
-    #         gt = batch_source['image'][0].cpu().numpy()
-    #         gt = (gt[:,:,::-1] * 255).astype(np.uint8)
-    #         if append_mask:
-    #             gt = np.dstack([gt, mask[:, :, None]])
-    #         gt_name = join(outdir, 'gt', '%04d.png'%(batch_idx))
-    #         cv2.imwrite(gt_name, gt)
-    #     renders = output['render'][0].permute(1, 2, 0).cpu().numpy()
-    #     renders = (np.clip(renders[:, :,::-1], 0., 1.) * 255).astype(np.uint8)
-    #     if append_mask:
-    #         renders = np.dstack([renders, mask[:, :, None]])
-    #     render_name = join(outdir, 'renders', '%04d.png'%(batch_idx))
-    #     cv2.imwrite(render_name, renders)
-
-    #     reders_points=renderer.marigold_depth_vis(output['point_weight_pixel'][0])
-    #     render_points_name = join(outdir, 'render_points', '%04d.png'%(batch_idx))
-    #     cv2.imwrite(render_points_name, reders_points)
-
-    #     #target render
-    #     with torch.no_grad():
-    #         # start = torch.cuda.Event(enable_timing=True)
-    #         # end = torch.cuda.Event(enable_timing=True)
-    #         torch.cuda.synchronize()
-    #         # start.record()
-    #         output_target = renderer.vis(batch_transformed, model)
-    #         torch.cuda.synchronize()
-    #         # end.record()
-    #     # total_time += start.elapsed_time(end)
-    #     # append_mask = False
-    #     # use foreground mask
-    #     # if 'mask' in batch.keys():
-    #     #     mask = batch['mask'][0].cpu().numpy()
-    #     #     mask = (mask * 255).astype(np.uint8)
-    #     #     append_mask = True
-    #     # if torch.is_tensor(batch['image'][0]):
-    #     #     gt = batch['image'][0].cpu().numpy()
-    #     #     gt = (gt[:,:,::-1] * 255).astype(np.uint8)
-    #     #     if append_mask:
-    #     #         gt = np.dstack([gt, mask[:, :, None]])
-    #     #     gt_name = join(outdir, 'gt', '%04d.png'%(batch_idx))
-    #     #     cv2.imwrite(gt_name, gt)
-    #     renders = output_target['render'][0].permute(1, 2, 0).cpu().numpy()
-    #     renders = (np.clip(renders[:, :,::-1], 0., 1.) * 255).astype(np.uint8)
-    #     if append_mask:
-    #         renders = np.dstack([renders, mask[:, :, None]])
-    #     render_name = join(outdir, 'target', '%04d.png'%(batch_idx))
-    #     cv2.imwrite(render_name, renders)
-
-    #     # reders_points=renderer.marigold_depth_vis(output['point_weight_pixel'][0])
-    #     # render_points_name = join(outdir, 'render_points', '%04d.png'%(batch_idx))
-    #     # cv2.imwrite(render_points_name, reders_points)
-    #     break
-    # print('scale: {}, Average time: {:.2f} ms, fps: {:.1f}'.format(scale, total_time / len(dataloader), 1000 / (total_time / len(dataloader))))
-
-    # while True:
-    #     pass
-        
-
-
-    # for batch_idx, batch in enumerate(tqdm(dataloader)):
-    #     batch_pre = prepare_batch(batch, device)
-    #     print('gen_batch')
-    #     pass
-    #     with torch.no_grad():
-    #         start = torch.cuda.Event(enable_timing=True)
-    #         end = torch.cuda.Event(enable_timing=True)
-    #         torch.cuda.synchronize()
-    #         start.record()
-    #         output = renderer.vis(batch, model)
-    #         torch.cuda.synchronize()
-    #         end.record()
-    #     total_time += start.elapsed_time(end)
-    #     append_mask = False
-    #     # use foreground mask
-    #     if 'mask' in batch.keys():
-    #         mask = batch['mask'][0].cpu().numpy()
-    #         mask = (mask * 255).astype(np.uint8)
-    #         append_mask = True
-    #     if torch.is_tensor(batch['image'][0]):
-    #         gt = batch['image'][0].cpu().numpy()
-    #         gt = (gt[:,:,::-1] * 255).astype(np.uint8)
-    #         if append_mask:
-    #             gt = np.dstack([gt, mask[:, :, None]])
-    #         gt_name = join(outdir, 'gt', '%04d.png'%(batch_idx))
-    #         cv2.imwrite(gt_name, gt)
-    #     renders = output['render'][0].permute(1, 2, 0).cpu().numpy()
-    #     renders = (np.clip(renders[:, :,::-1], 0., 1.) * 255).astype(np.uint8)
-    #     if append_mask:
-    #         renders = np.dstack([renders, mask[:, :, None]])
-    #     render_name = join(outdir, 'renders', '%04d.png'%(batch_idx))
-    #     cv2.imwrite(render_name, renders)
-    # print('scale: {}, Average time: {:.2f} ms, fps: {:.1f}'.format(scale, total_time / len(dataloader), 1000 / (total_time / len(dataloader))))
 
 
 def main():
@@ -399,7 +320,10 @@ def main():
     exp = cfg.exp
     # if 'CUDA_VISIBLE_DEVICES' not in os.environ:
     #     os.environ['CUDA_VISIBLE_DEVICES'] = ', '.join([str(gpu) for gpu in cfg.gpus])
-    os.environ["CUDA_VISIBLE_DEVICES"]="2"
+    os.environ["CUDA_VISIBLE_DEVICES"]="0"
+
+    # for cuda debug
+    os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     print(f'Using GPUs: {os.environ["CUDA_VISIBLE_DEVICES"]}')
     print('Write to {}'.format(exp))
     # write the parameter to the exp

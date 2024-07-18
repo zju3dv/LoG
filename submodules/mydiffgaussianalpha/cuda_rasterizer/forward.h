@@ -78,6 +78,26 @@ namespace FORWARD
 		float* out_point_weight_pixel,
 		float* out_point_weight
 		);
+
+	//Sample the weight while render
+	void render_sample(
+		const dim3 grid, dim3 block,
+		const uint2* ranges,
+		const uint32_t* point_list,
+		int W, int H,
+		const float2* means2D,
+		const float* colors,
+		const float* depths,
+		const float4* conic_opacity,
+		float* final_T,
+		uint32_t* n_contrib,
+		const float* bg_color,
+		float* out_color,
+		int* out_point_id,
+		float* out_point_weight_pixel,
+		float* out_point_weight
+		// float* out_point_weight_primitive
+	);
 }
 
 

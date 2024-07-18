@@ -1,5 +1,5 @@
 # from diff_gaussian_rasterization_wodilate import GaussianRasterizationSettings, GaussianRasterizer
-from alpha_gaussian_rasterization_wodilate import GaussianRasterizationSettings, GaussianRasterizer
+from alpha_gaussian_rasterization_wodilate import GaussianRasterizationSettings, GaussianRasterizer, GaussianSampler
 import math
 import os
 import time
@@ -12,6 +12,7 @@ import torch.nn as nn
 class BaseRender(torch.nn.Module):
     GaussianRasterizationSettings = GaussianRasterizationSettings
     GaussianRasterizer = GaussianRasterizer
+    GaussianSampler = GaussianSampler
     @staticmethod
     def float32_to_uint8(array):
         return np.clip(array*255, 0, 255).astype(np.uint8)
@@ -77,6 +78,31 @@ class BaseRender(torch.nn.Module):
         )
 
         rasterizer = BaseRender.GaussianRasterizer(raster_settings=raster_settings)
+        return rasterizer
+    
+    @staticmethod
+    def prepare_sample(viewpoint_camera, background, scaling_modifier=1.):
+        if not isinstance(viewpoint_camera, dict):
+            viewpoint_camera = viewpoint_camera.to_dict()
+        # Set up rasterization configuration
+        tanfovx = math.tan(viewpoint_camera['FoVx'] * 0.5)
+        tanfovy = math.tan(viewpoint_camera['FoVy'] * 0.5)
+        raster_settings = BaseRender.GaussianRasterizationSettings(
+            image_height=int(viewpoint_camera['image_height']),
+            image_width=int(viewpoint_camera['image_width']),
+            tanfovx=tanfovx,
+            tanfovy=tanfovy,
+            bg=background,
+            scale_modifier=scaling_modifier,
+            viewmatrix=viewpoint_camera['world_view_transform'],
+            projmatrix=viewpoint_camera['full_proj_transform'],
+            sh_degree=0,
+            campos=viewpoint_camera['camera_center'],
+            prefiltered=False,
+            debug=False
+        )
+
+        rasterizer = BaseRender.GaussianSampler(raster_settings=raster_settings)
         return rasterizer
 
 class NaiveRendererAndLoss(BaseRender):
@@ -223,8 +249,138 @@ class NaiveRendererAndLoss(BaseRender):
             ret["point_weight_pixel"] = point_weight_pixel.data
         ret['render'] = rendered_image[:3]
         return ret, model_data
+    
+    def render_sample(self, camera, rasterizer, model, extra_params={}):
+        #ret refer to all the gaussian points propertes
+        ret = model.get_all(camera, rasterizer, **extra_params)
+        if len(ret) == 0:
+            device = camera['world_view_transform'].device
+            ret = {
+                'xyz': torch.zeros((0, 3), device=device),
+                'opacity': torch.zeros((0,), device=device),
+                'colors': torch.zeros((0, 3), device=device),
+                'scaling': torch.zeros((0, 3), device=device) + 0.1,
+                'rotation': torch.zeros((0, 4), device=device)
+            }
+        xyz = ret['xyz']
+        opacity = ret['opacity']
+        colors = ret['colors']
+        scales = ret['scaling']
+        rotations = ret['rotation']
 
-    def prepare_camera(self, batch, bn, background, is_train=False):
+        cov3D = None
+        empty_xyz = model.empty_xyz
+        
+        screenspace_points = torch.zeros_like(xyz, dtype=empty_xyz.dtype, device=empty_xyz.device, requires_grad=True)
+        try:
+            screenspace_points.retain_grad()
+        except:
+            pass
+        model_data = ret
+        # args are all the input val
+        """
+        xyz: points coord
+        screenspace_points: zero
+        shs: 
+        colors:
+        cov3D: None
+        """
+        name_args = {
+            'means3D': xyz,
+            'means2D': screenspace_points,
+            'shs': None,
+            'colors_precomp': colors,
+            'opacities': opacity,
+            'scales': scales,
+            'rotations': rotations,
+            'cov3D_precomp': cov3D
+        }
+        if not self.use_origin_render and not model.training:
+            name_args['use_filter'] = False
+        # 渲染图像的地方
+        ret = rasterizer(**name_args)
+        # ret = rasterizer()
+        # radii ?  这里的point_id_pixel出现了重复
+        if len(ret)== 8:
+            rendered_image, radii, point_id_pixel, point_weight_pixel, point_weight, range_size, ranges ,primitive_index= ret
+
+            point_id, point_count = torch.unique(point_id_pixel, sorted=True, return_counts=True)
+            if point_id[0] == -1:
+                point_id = point_id[1:]
+                point_count = point_count[1:]
+            
+            xyz1 = torch.cat([xyz.detach(), torch.ones_like(xyz[:, :1])], dim=1)
+            xyz1_RT = xyz1 @ camera['world_view_transform']
+            point_depth = xyz1_RT[:, 2]
+            ret = {
+                "render": rendered_image,
+                "point_id": point_id,
+                "point_count": point_count,
+                "point_weight": point_weight,
+                "focal": max(camera['K'][0, 0], camera['K'][1, 1]),
+                "point_depth": point_depth,
+                "viewspace_points": screenspace_points,
+                "radii": radii,
+                "visibility_flag": model.visibility_flag,
+                "xyz": xyz,
+                "colors": colors,
+                "scales": scales, # scales of visibility points
+                "opacity": opacity,
+                "range_size":range_size,
+                "primitive_index":primitive_index,
+                "ranges":ranges
+            }
+        else: 
+            rendered_image, radii, point_id_pixel, point_weight_pixel, point_weight = ret
+            point_id, point_count = torch.unique(point_id_pixel, sorted=True, return_counts=True)
+            if point_id[0] == -1:
+                point_id = point_id[1:]
+                point_count = point_count[1:]
+        
+            render_time = 0
+            xyz1 = torch.cat([xyz.detach(), torch.ones_like(xyz[:, :1])], dim=1)
+            xyz1_RT = xyz1 @ camera['world_view_transform']
+            point_depth = xyz1_RT[:, 2]
+            ret = {
+                "render": rendered_image,
+                "point_id": point_id,
+                "point_count": point_count,
+                "point_weight": point_weight,
+                "focal": max(camera['K'][0, 0], camera['K'][1, 1]),
+                "point_depth": point_depth,
+                "viewspace_points": screenspace_points,
+                "radii": radii,
+                "visibility_flag": model.visibility_flag,
+                "xyz": xyz,
+                "colors": colors,
+                "scales": scales, # scales of visibility points
+                "opacity": opacity,
+                "render_time": render_time
+            }
+        
+
+        if self.render_depth:
+            ones = torch.ones_like(point_depth)
+            height = xyz[:, 2]
+            colors_depth = torch.stack([point_depth, height, ones], dim=-1)
+            ret_depth = rasterizer(
+                means3D = xyz,
+                means2D = screenspace_points,
+                shs = None,
+                colors_precomp = colors_depth,
+                opacities = opacity,
+                scales = scales,
+                rotations = rotations,
+                cov3D_precomp = cov3D)
+            ret['depth'] = ret_depth[0][0]
+            ret['height'] = ret_depth[0][1]
+            ret['accmap'] = ret_depth[0][2]
+        if point_weight_pixel is not None:
+            ret["point_weight_pixel"] = point_weight_pixel.data
+        ret['render'] = rendered_image[:3]
+        return ret, model_data
+
+    def prepare_camera(self, batch, bn, background, is_train=False,is_sample=False):
         camera = {}
         for key in ['camera_center', 'world_view_transform', 'full_proj_transform', 'image_width', 'image_height', 'FoVx', 'FoVy', 'K', 'R', 'T']:
             camera[key] = batch['camera'][key][bn]
@@ -239,7 +395,10 @@ class NaiveRendererAndLoss(BaseRender):
                 background = torch.rand_like(self.background)
             else:
                 background = self.background
-        rasterizer = self.prepare(camera, background, scaling_modifier=1)
+        if is_sample:
+            rasterizer = self.prepare_sample(camera, background, scaling_modifier=1)
+        else:
+            rasterizer = self.prepare(camera, background, scaling_modifier=1)
         return camera, rasterizer, background
 
     def vis(self, batch, model, background=None):
@@ -274,10 +433,12 @@ class NaiveRendererAndLoss(BaseRender):
                 preds[key] = torch.stack(preds[key])
         return preds
     
+    #sample 函数由vis改造，在渲染的基础上获取更多的参数 
     def sample(self, batch, model, background=None):
         preds = defaultdict(list)
         for bn in range(batch['camera']['camera_center'].shape[0]):
-            camera, rasterizer, background = self.prepare_camera(batch, bn, background, is_train=model.training)
+            camera, sampler, background = self.prepare_camera(batch, bn, background, is_train=model.training,is_sample=True)
+            # camera, sampler, background = self.prepare_camera(batch, bn, background, is_train=model.training)
             if model.training and self.use_rand_radius:
                 origin_radius = model.tree.min_resolution_pixel
                 random_log2 = torch.rand(1).item()
@@ -288,10 +449,10 @@ class NaiveRendererAndLoss(BaseRender):
                     # random_log2: (0, 0.5) => (0, 1) => (1, 2)
                     pixel_radius = 3 * 2 ** (random_log2 * 2)
                 model.tree.min_resolution_pixel = pixel_radius
-            model.prepare(rasterizer, camera)
+            model.prepare(sampler, camera)
             #在这里，camara对应一个图片的信息，rasterizer对应一个相机的参数，model对应当前所有primitive
             #render_pkg 为模型输出数据 ，model_data 为模型输入数据
-            render_pkg, model_data = self.render(camera, rasterizer, model)
+            render_pkg, model_data = self.render_sample(camera, sampler, model)
             if model.training and self.use_rand_radius:
                 model.tree.min_resolution_pixel = origin_radius
             for key, val in render_pkg.items():
@@ -299,6 +460,9 @@ class NaiveRendererAndLoss(BaseRender):
         for key in ['render', 'render_correct', 'render_max']:
             if key in preds.keys():
                 preds[key] = torch.stack(preds[key])
+        #新的获取参数
+
+
         return preds
 
     def calculate_loss(self, gt_image, render, output, mask_ignore=None):

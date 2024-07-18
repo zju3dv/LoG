@@ -9,11 +9,11 @@
  * For inquiries contact  george.drettakis@inria.fr
  */
 
-#ifndef CUDA_RASTERIZER_CONFIG_H_INCLUDED
-#define CUDA_RASTERIZER_CONFIG_H_INCLUDED
+// #ifndef CUDA_RASTERIZER_CONFIG_H_INCLUDED
+// #define CUDA_RASTERIZER_CONFIG_H_INCLUDED
 
 #define NUM_CHANNELS 3 // Default 3, RGB, acc, depth
 #define BLOCK_X 16
 #define BLOCK_Y 16
 #define DILATE_PIXEL 0.3 // 0.3 for one pixel
-#endif
+// #endif
