@@ -112,13 +112,13 @@ class _RasterizeGaussians(torch.autograd.Function):
         if raster_settings.debug:
             cpu_args = cpu_deep_copy_tuple(args) # Copy them before they can be corrupted
             try:
-                num_rendered, color, point_id, point_weight_pixel, point_weight, radii, range_size, geomBuffer, binningBuffer, imgBuffer = _C.rasterize_gaussians(*args)
+                num_rendered, color, point_id, point_weight_pixel, point_weight, radii, geomBuffer, binningBuffer, imgBuffer = _C.rasterize_gaussians(*args)
             except Exception as ex:
                 torch.save(cpu_args, "snapshot_fw.dump")
                 print("\nAn error occured in forward. Please forward snapshot_fw.dump for debugging.")
                 raise ex
         else:
-            num_rendered, color, point_id, point_weight_pixel, point_weight, radii, range_size, geomBuffer, binningBuffer, imgBuffer = _C.rasterize_gaussians(*args)
+            num_rendered, color, point_id, point_weight_pixel, point_weight, radii, geomBuffer, binningBuffer, imgBuffer = _C.rasterize_gaussians(*args)
         # Keep relevant tensors for backward
         ctx.raster_settings = raster_settings
         ctx.num_rendered = num_rendered
@@ -237,7 +237,7 @@ class _SampleGaussians(torch.autograd.Function):
                 raise ex
             return color, point_id, point_weight_pixel, point_weight, radii
         else:
-            num_rendered, color, point_id, point_weight_pixel, point_weight, radii, range_size, ranges,primitive_index = _C.sample_gaussians(*args)
+            num_rendered, color, point_id, point_weight_pixel, point_weight, radii, range_size, ranges,primitive_index,alpha_accumulation = _C.sample_gaussians(*args)
 
         # print(num_rendered)
         # print(color[0][0][0])
@@ -246,7 +246,7 @@ class _SampleGaussians(torch.autograd.Function):
         #     print(range_size[0][i].item(),ranges[0][i][1].item(),ranges[0][i][0].item(), ranges[0][i][1]-ranges[0][i][0].item())
 
 
-        return color, point_id, point_weight_pixel, point_weight, radii, range_size, ranges, primitive_index
+        return color, point_id, point_weight_pixel, point_weight, radii, range_size, ranges, primitive_index,alpha_accumulation
 
 
 

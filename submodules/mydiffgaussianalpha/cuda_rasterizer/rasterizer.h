@@ -57,7 +57,7 @@ namespace CudaRasterizer
 			float* out_point_weight,
 			int* radii = nullptr,
 			bool debug = false);
-		
+
 		static int forward_sample(
 			std::function<char* (size_t)> geometryBuffer,
 			std::function<char* (size_t)> binningBuffer,
@@ -65,38 +65,7 @@ namespace CudaRasterizer
 			const int P, int D, int M,
 			const float* background,
 			const int width, int height,
-			const float* means3D,
-			const float* shs,
-			const float* colors_precomp,
-			const float* opacities,
-			const float* scales,
-			const float scale_modifier,
-			const float* rotations,
-			const float* cov3D_precomp,
-			const float* viewmatrix,
-			const float* projmatrix,
-			const float* cam_pos,
-			const float tan_fovx, float tan_fovy,
-			const bool prefiltered,
-			const bool use_filter,
-			float* out_color,
-			int* out_point_id,
-			float* out_point_weight_pixel,
-			float* out_point_weight,
-			int* radii,
-			int* range_size,
-			torch::Tensor& primitive_index,
-			int* ranges,
-			torch::Tensor& primitive_weight,
-			bool debug = false);
-
-		static int forward_sample_test(
-			std::function<char* (size_t)> geometryBuffer,
-			std::function<char* (size_t)> binningBuffer,
-			std::function<char* (size_t)> imageBuffer,
-			const int P, int D, int M,
-			const float* background,
-			const int width, int height,
+			const int accum_step,
 			const float* means3D,
 			const float* shs,
 			const float* colors_precomp,
@@ -119,6 +88,7 @@ namespace CudaRasterizer
 			int* range_size,// each tile primitives number //当前先计算总数量，下一步计算在一个大于限制的量
 			int* ranges,
 			torch::Tensor& primitive_index,
+			float* pixel_accumulation,
 			bool debug);
 
 		static void backward(

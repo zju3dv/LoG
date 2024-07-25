@@ -84,7 +84,7 @@ namespace FORWARD
 		const dim3 grid, dim3 block,
 		const uint2* ranges,
 		const uint32_t* point_list,
-		int W, int H,
+		int W, int H, int accum_step,
 		const float2* means2D,
 		const float* colors,
 		const float* depths,
@@ -95,8 +95,8 @@ namespace FORWARD
 		float* out_color,
 		int* out_point_id,
 		float* out_point_weight_pixel,
-		float* out_point_weight
-		// float* out_point_weight_primitive
+		float* out_point_weight,
+		float* alpha_accum
 	);
 }
 

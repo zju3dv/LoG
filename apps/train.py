@@ -9,10 +9,12 @@ from LoG.trajectory.camera_view import Camera_view
 from LoG.trajectory.utils import GPU_to_colmap,colmap_gen_R_xoy
 from LoG.dataset.camera_utils import get_colmap_transform
 from LoG.dataset.colmap import batch_transform
-from LoG.analysis.analyze import histogram_analysis
+from LoG.analysis.analyze import analyze_hist,summary_analyze
 import cv2
 import torch
 import wandb
+import math
+import matplotlib.pyplot as plt
 
 def demo(cfg, model, device):
     dataset = load_object(cfg[cfg.split].dataset.module, cfg[cfg.split].dataset.args)
@@ -89,6 +91,8 @@ def demo(cfg, model, device):
     print('Average time: {:.2f} ms, fps: {:.1f}'.format(total_time / len(dataloader), 1000 / (total_time / len(dataloader))))
     renderer.make_video(os.path.dirname(outname), fps=cfg[cfg.split].get('fps', 30))
 
+
+
 def validate_for_metric(exp, dataset, model, renderer, device):
     renderer.to(device)
     model.to(device)
@@ -141,7 +145,7 @@ def renderability(exp, dataset, model, renderer,trajectory, device):
     model.eval()
     model.training=True
     from LoG.utils.trainer import prepare_batch
-    scale =1 
+    scale =4 
     
     dataset.set_state(scale=scale)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
@@ -228,6 +232,27 @@ def renderability(exp, dataset, model, renderer,trajectory, device):
         trajectory.view()
     '''
 
+    # np.zeros([])
+
+    # # range_size analysis
+    # np_range_size=output['range_size'][0].cpu().numpy().reshape(-1,)
+    # histogram_analysis(np_range_size,'range_size',batch_idx)
+
+    # # get the max depth
+    # primitive_idx=output['ranges'][0].cpu().numpy()[:,:,1].reshape(-1,)-1
+    # fatherest_depth_index=output['primitive_index'][0].cpu().numpy()[primitive_idx]
+    # #use fatherest_depth_index as index to access the output['depth'][0]
+    # depth = output['point_depth'][0].cpu().numpy()
+    # depth = depth.reshape(-1)
+
+    # selected_depth = depth[fatherest_depth_index]
+    # histogram_analysis(selected_depth,'max_depth',batch_idx)
+
+    # #analysis the depth
+    # np_range_size=output['point_depth'][0].cpu().numpy().reshape(-1,)
+    # histogram_analysis(np_range_size,'depth',batch_idx)
+
+
 
     for batch_idx, batch in enumerate(tqdm(dataloader)):
         # batch_transformed=prepare_batch(view_camera_feature, device)
@@ -241,21 +266,10 @@ def renderability(exp, dataset, model, renderer,trajectory, device):
             torch.cuda.synchronize()
         append_mask = False
 
-        # range_size analysis
-        np_range_size=output['range_size'][0].cpu().numpy().reshape(-1,)
-        histogram_analysis(np_range_size,'range_size',batch_idx)
+        ##analyze per image with histogram (tile based)
+        # analyze_hist(output,batch_idx)
 
-        # get the max depth
-        fatherest_depth_index=output['ranges'][0].cpu().numpy()[:,:,1].reshape(-1,)-1
-        #use fatherest_depth_index as index to access the output['depth'][0]
-        depth = output['point_depth'][0].cpu().numpy()
-        depth = depth.reshape(-1)
-        selected_depth = depth[fatherest_depth_index]
-        histogram_analysis(selected_depth,'max_depth',batch_idx)
 
-        #analysis the depth
-        np_range_size=output['point_depth'][0].cpu().numpy().reshape(-1,)
-        histogram_analysis(np_range_size,'depth',batch_idx)
 
 
 
@@ -295,6 +309,94 @@ def renderability(exp, dataset, model, renderer,trajectory, device):
         reders_points=renderer.marigold_depth_vis(output['point_weight_pixel'][0])
         render_points_name = join(outdir, 'render_points', '%04d.png'%(batch_idx))
         cv2.imwrite(render_points_name, reders_points)
+
+
+def analyze(exp, dataset, model, renderer,trajectory, device):
+    renderer.to(device)
+    model.to(device)
+    # trajectory.to(device)
+    model.eval()
+    model.training=True
+    from LoG.utils.trainer import prepare_batch
+    scale =1 
+    
+    dataset.set_state(scale=scale)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
+    outdir = join(exp, 'test', 'scale_{}'.format(scale))
+    os.makedirs(join(outdir, 'gt'), exist_ok=True)
+    os.makedirs(join(outdir, 'renders'), exist_ok=True)
+    os.makedirs(join(outdir, 'render_points'), exist_ok=True)
+    os.makedirs(join(outdir, 'target'), exist_ok=True)
+    total_time = 0
+
+
+    depth_count=np.zeros([5000])
+    max_depth_count=np.zeros([5000])
+    range_size_count=np.zeros([10000])
+
+
+
+    for batch_idx, batch in enumerate(tqdm(dataloader)):
+        # batch_transformed=prepare_batch(view_camera_feature, device)
+        batch_source = prepare_batch(batch, device)
+        # print('gen_batch')
+        # pass
+        with torch.no_grad():
+            torch.cuda.synchronize()
+            # output = renderer.vis(batch_source, model)
+            output = renderer.sample(batch_source, model)
+            torch.cuda.synchronize()
+        append_mask = False
+
+        ##analyze per image with histogram (tile based)
+        # analyze_hist(output,batch_idx)
+
+        ## accumulation
+        unique, counts = np.unique(output['range_size'][0].cpu().numpy().reshape(-1,), return_counts=True)
+        range_size_count[unique]+=counts
+
+        p_depth=output['point_depth'][0].cpu().numpy().reshape(-1,)
+        transformed_array = np.floor(p_depth * 100).astype(int)
+        unique, counts=np.unique(transformed_array, return_counts=True)
+        depth_count[unique]+=counts
+
+        primitive_idx=output['ranges'][0].cpu().numpy()[:,:,1].reshape(-1,)-1
+        fatherest_depth_index=output['primitive_index'][0].cpu().numpy()[primitive_idx]
+        depth = output['point_depth'][0].cpu().numpy()
+        depth = depth.reshape(-1)
+        selected_depth = depth[fatherest_depth_index]
+        transformed_array = np.floor(selected_depth * 100).astype(int)
+        unique, counts=np.unique(transformed_array, return_counts=True)
+        max_depth_count[unique]+=counts
+
+        #alpha accum test
+        alpha_accum_test=output['alpha_accumulation'][0].cpu().numpy()[123,123:1123:200,:]
+
+        # Create a figure to hold the subplots
+        plt.figure(figsize=(10, 20))  # Adjust the size as needed
+
+        # Loop through the arrays and create a subplot for each
+        for i in range(5):
+            array=alpha_accum_test[i,:]
+            plt.subplot(5, 1, i+1)  # 10 rows, 1 column, ith subplot
+            plt.bar(range(len(array)), array)
+            plt.title(f'pixel index ['+str(123)+','+str(123+i*200)+'] alpha distribution')
+
+        plt.tight_layout()  # Adjust subplots to fit into the figure area.
+        plt.show()
+        plt.savefig(os.path.join("analysis_image", "pixel_alpha",'pixel_alpha.png'))
+
+    
+    # save the histogram
+    output_all={}
+    output_all['range_size']=range_size_count
+    output_all['point_depth']=depth_count
+    output_all['max_depth']=max_depth_count
+    summary_analyze(output_all,batch_idx)
+    np.savetxt("analysis_image/sum_info/range_size.csv", output_all['range_size'], delimiter=",")
+    np.savetxt("analysis_image/sum_info/point_depth.csv", output_all['point_depth'], delimiter=",")
+    np.savetxt("analysis_image/sum_info/max_depth.csv", output_all['max_depth'], delimiter=",")
+
 
 
 

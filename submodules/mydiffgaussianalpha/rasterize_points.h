@@ -38,7 +38,7 @@ RasterizeGaussiansCUDA(
 	const bool use_filter,
 	const bool debug);
 
-std::tuple<int, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+std::tuple<int, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 SampleGaussiansCUDA(
 	const torch::Tensor& background,
 	const torch::Tensor& means3D,

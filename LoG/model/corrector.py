@@ -38,7 +38,7 @@ class Corrector(nn.Module):
         index = [self.index]
         self.optimizer.steps['view_correction'][index] += 1
         steps = self.optimizer.steps['view_correction'][index] - self.start_step
-        if steps < 0:
+        if steps.shape[0] < 0:
             return 0
         exp_avg = self.optimizer.exp_avg['view_correction'][index]
         exp_avg_sq = self.optimizer.exp_avg_sq['view_correction'][index]

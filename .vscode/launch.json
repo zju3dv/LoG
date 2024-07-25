@@ -1,0 +1,71 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "name": "Python Debugger: gui",
+            "type": "python",
+            "request": "launch",
+            "program": "apps/gui.py",
+            "console": "integratedTerminal",
+             //环境名对应的python路径
+            "python": "C:/Users/Admin/miniconda3/envs/log/python.exe",
+            "args":[
+                "filename=config/Yingrenshi_add_path/train.yml",
+                "ckptname=output/Yingrenshi_add_path/log/model_latest.pth",
+                
+            ],
+            "justMyCode": false
+        },
+        
+        {
+            "name": "Python Debugger: renderability",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+             //环境名对应的python路径
+            "python": "/root/miniconda3/envs/log/bin/python",
+            "args":[
+                "--cfg","/root/repository/project/sci/log/LoG/config/Yingrenshi_add_path/train.yml",
+                "split","renderability",
+                "ckptname","output/Yingrenshi_add_path/log/model_latest.pth",
+                
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python Debugger: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+             //环境名对应的python路径
+            "python": "/root/miniconda3/envs/log/bin/python",
+            "args":[
+                "--cfg","/root/repository/project/sci/log/LoG/config/Yingrenshi_add_path_test/train.yml",
+                "split","train"
+            ]
+        },
+        {
+            "name": "Python Debugger: read_colmap",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+             //环境名对应的python路径
+            "python": "/root/miniconda3/envs/log/bin/python",
+            "args":[
+                "/root/repository/project/sci/log/LoG/data/Yingrenshi/sparse_align",
+                "--min_views","2"
+            ]
+        }
+        
+    ]
+}

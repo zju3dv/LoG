@@ -425,216 +425,7 @@ int CudaRasterizer::Rasterizer::forward_sample(
 	const int P, int D, int M,
 	const float* background,
 	const int width, int height,
-	const float* means3D,
-	const float* shs,
-	const float* colors_precomp,
-	const float* opacities,
-	const float* scales,
-	const float scale_modifier,
-	const float* rotations,
-	const float* cov3D_precomp,
-	const float* viewmatrix,
-	const float* projmatrix,
-	const float* cam_pos,
-	const float tan_fovx, float tan_fovy,
-	const bool prefiltered,
-	const bool use_filter,
-	float* out_color,
-	int* out_point_id,
-	float* out_point_weight_pixel,
-	float* out_point_weight,
-	int* radii,
-	int* range_size,// each tile primitives number //当前先计算总数量，下一步计算在一个大于限制的量
-	torch::Tensor& primitive_index,
-	int* ranges,
-	torch::Tensor& primitive_weight,
-	bool debug)
-{
-	const float focal_y = height / (2.0f * tan_fovy);
-	const float focal_x = width / (2.0f * tan_fovx);
-
-	//print size
-	// printf("print size\n");
-	// printf("float:%d\n", sizeof(float));
-	// printf("int:%d\n", sizeof(int));
-	// printf("uint32_t:%d\n", sizeof(uint32_t));
-	// printf("float2:%d\n",sizeof(float2));
-	// printf("float4:%d\n",sizeof(float4));
-	
-	// primitive and screen parameter
-	//logic: 
-	// 1. calculate the primitive cache requirement
-	// 2. allocate the primitive cache
-	// 3. generate the GeometryState
-	size_t chunk_size = required<GeometryState>(P);
-	char* chunkptr = geometryBuffer(chunk_size);
-	GeometryState geomState = GeometryState::fromChunk(chunkptr, P);
-
-	if (radii == nullptr)
-	{
-		radii = geomState.internal_radii; //set to 0
-	}
-	//这里是将整个图像分成各个不同的block，每个block的大小是16*16，tile_grid 表示整个图像行列block数量
-	dim3 tile_grid((width + BLOCK_X - 1) / BLOCK_X, (height + BLOCK_Y - 1) / BLOCK_Y, 1);
-	dim3 block(BLOCK_X, BLOCK_Y, 1);
-
-	// Dynamically resize image-based auxiliary buffers during training
-	size_t img_chunk_size = required<ImageState>(width * height);
-	char* img_chunkptr = imageBuffer(img_chunk_size);
-	ImageState imgState = ImageState::fromChunk(img_chunkptr, width * height);
-
-	if (NUM_CHANNELS != 3 && colors_precomp == nullptr)
-	{
-		throw std::runtime_error("For non-RGB, provide precomputed Gaussian colors!");
-	}
-
-	// Run preprocessing per-Gaussian (transformation, bounding, conversion of SHs to RGB)
-	CHECK_CUDA(FORWARD::preprocess(
-		P, D, M,
-		means3D,
-		(glm::vec3*)scales,
-		scale_modifier,
-		(glm::vec4*)rotations,
-		opacities,
-		shs,
-		geomState.clamped,
-		cov3D_precomp,
-		colors_precomp,
-		viewmatrix, projmatrix,
-		(glm::vec3*)cam_pos,
-		width, height,
-		focal_x, focal_y,
-		tan_fovx, tan_fovy,
-		radii,
-		geomState.means2D,
-		geomState.depths,
-		geomState.cov3D,
-		geomState.rgb,
-		geomState.conic_opacity,
-		tile_grid,
-		geomState.tiles_touched,
-		prefiltered,
-		use_filter
-	), debug)
-
-	// Compute prefix sum over full list of touched tile counts by Gaussians
-	// E.g., [2, 3, 0, 2, 1] -> [2, 5, 5, 7, 8]
-	CHECK_CUDA(cub::DeviceScan::InclusiveSum(geomState.scanning_space, geomState.scan_size, geomState.tiles_touched, geomState.point_offsets, P), debug)
-
-	// Retrieve total number of Gaussian instances to launch and resize aux buffers
-	int num_rendered;
-	CHECK_CUDA(cudaMemcpy(&num_rendered, geomState.point_offsets + P - 1, sizeof(int), cudaMemcpyDeviceToHost), debug);
-
-	size_t binning_chunk_size = required<BinningState>(num_rendered);
-	char* binning_chunkptr = binningBuffer(binning_chunk_size);
-	BinningState binningState = BinningState::fromChunk(binning_chunkptr, num_rendered);
-
-	// For each instance to be rendered, produce adequate [ tile | depth ] key 
-	// and corresponding dublicated Gaussian indices to be sorted
-	duplicateWithKeys << <(P + 255) / 256, 256 >> > (
-		P,
-		geomState.means2D,
-		geomState.depths,
-		geomState.point_offsets,
-		binningState.point_list_keys_unsorted,
-		binningState.point_list_unsorted,
-		radii,
-		tile_grid)
-	CHECK_CUDA(, debug)
-
-	int bit = getHigherMsb(tile_grid.x * tile_grid.y);
-
-	// Sort complete list of (duplicated) Gaussian indices by keys
-	CHECK_CUDA(cub::DeviceRadixSort::SortPairs(
-		binningState.list_sorting_space,
-		binningState.sorting_size,
-		binningState.point_list_keys_unsorted, binningState.point_list_keys,
-		binningState.point_list_unsorted, binningState.point_list,
-		num_rendered, 0, 32 + bit), debug)
-
-	CHECK_CUDA(cudaMemset(imgState.ranges, 0, tile_grid.x * tile_grid.y * sizeof(uint2)), debug);
-
-	//计算每个tile的range
-	// Identify start and end of per-tile workloads in sorted list
-	
-	if (num_rendered > 0)
-		identifyTileRanges << <(num_rendered + 255) / 256, 256 >> > (
-			num_rendered,
-			binningState.point_list_keys,
-			imgState.ranges);
-	CHECK_CUDA(, debug)
-	
-	//sample weight , 取最大的K_TOP个weight
-	// 2value index,weight
-	primitive_weight=torch::full({width,height,K_TOP,2}, 0, torch::kFloat32);
-
-	// Let each tile blend its range of Gaussians independently in parallel
-	const float* feature_ptr = colors_precomp != nullptr ? colors_precomp : geomState.rgb;
-	const float* depth_ptr = geomState.depths;
-	CHECK_CUDA(FORWARD::render_sample(
-		tile_grid, block,
-		imgState.ranges,
-		binningState.point_list,
-		width, height,
-		geomState.means2D,
-		feature_ptr,
-		depth_ptr,
-		geomState.conic_opacity,
-		imgState.accum_alpha,
-		imgState.n_contrib,
-		background,
-		out_color,
-		out_point_id,
-		out_point_weight_pixel,
-		out_point_weight
-		// primitive_weight.contiguous().data<float>()
-	), debug)
-
-
-	//--------------------------------------------------------------------------------------------------
-	// //sample data assign
-	// printf("starting to compute the range size1\n");
-	// compute_range_size<< <(num_rendered+255)/256, 256 >> > (
-	// 		num_rendered,
-	// 		range_size,
-	// 		imgState.ranges
-	// 		);
-	// CHECK_CUDA(, debug)
-	// printf("finish to compute the range size\n");
-
-	// printf("starting to compute the primitive_index\n");
-	// //这里的index 为复制point_list，
-	// primitive_index=torch::full({num_rendered}, 0, torch::kInt32);
-	// copy_primitive_index<< <(num_rendered+255)/256, 256>> > (
-	// 		num_rendered,
-	// 		primitive_index.contiguous().data<int>(),
-	// 		binningState.point_list);
-	// CHECK_CUDA(, debug)
-	// printf(" complete the primitive_index\n");
-	
-	// printf("starting to compute the ranges\n");
-	// int block_num=((width + BLOCK_X - 1) / BLOCK_X)* ((height + BLOCK_Y - 1)/ BLOCK_Y);
-	// copy_ranges<< <(block_num + 255) / 256, 256 >> > (
-	// 		block_num,
-	// 		ranges,
-	// 		imgState.ranges);
-	// CHECK_CUDA(, debug)
-	// printf("end");
-	//-------------------------------------------------------------------------------------------------
-
-
-	return num_rendered;
-}
-
-// Forward rendering procedure for differentiable rasterization
-// of Gaussians.
-int CudaRasterizer::Rasterizer::forward_sample_test(
-	std::function<char* (size_t)> geometryBuffer,
-	std::function<char* (size_t)> binningBuffer,
-	std::function<char* (size_t)> imageBuffer,
-	const int P, int D, int M,
-	const float* background,
-	const int width, int height,
+	const int accum_step,
 	const float* means3D,
 	const float* shs,
 	const float* colors_precomp,
@@ -657,6 +448,7 @@ int CudaRasterizer::Rasterizer::forward_sample_test(
 	int* range_size,// each tile primitives number //当前先计算总数量，下一步计算在一个大于限制的量
 	int* ranges,
 	torch::Tensor& primitive_index,
+	float* pixel_accum,
 	bool debug)
 {
 	const float focal_y = height / (2.0f * tan_fovy);
@@ -771,37 +563,23 @@ int CudaRasterizer::Rasterizer::forward_sample_test(
 
 	//--------------------------------------------------------------------------------------------------
 	//sample data assign
-	auto start = std::chrono::high_resolution_clock::now();
-	printf("starting to compute the range size1\n");
 	int len_block=((width + BLOCK_X - 1) / BLOCK_X)*( (height + BLOCK_Y - 1) / BLOCK_Y);
 	compute_range_size<< <(len_block+255)/256, 256 >> > (
 			len_block,
 			range_size,
 			imgState.ranges);
 	CHECK_CUDA(, debug)
-	printf("finish to compute the range size\n");
 
-	printf("start to compute the ranges\n");
+	//the ranges copy
 	copy_ranges<< <(len_block+255)/256, 256 >> > (
 			len_block,
 			ranges,
 			imgState.ranges);
 	CHECK_CUDA(, debug)		
-	printf("fin compute the ranges\n");
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-	std::cout << "range compute Time taken: " << duration << " microseconds" << std::endl;	
 
-	start = std::chrono::high_resolution_clock::now();
 	CHECK_CUDA(cudaMemcpy(primitive_index.contiguous().data<int>(), binningState.point_list, num_rendered * sizeof(int), cudaMemcpyDeviceToHost), debug);
-	end = std::chrono::high_resolution_clock::now();
-	duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-	std::cout << "range compute Time taken: " << duration << " microseconds" << std::endl;	
 
-	for(int i=0;i<10;i++){
-		std::cout<<" "<<primitive_index.contiguous().data<int>()[i];
-	}
-	std::cout<<std::endl;
+
 	//---------------------------------------------------------------------------------------------------
 
 
@@ -811,11 +589,11 @@ int CudaRasterizer::Rasterizer::forward_sample_test(
 	// Let each tile blend its range of Gaussians independently in parallel
 	const float* feature_ptr = colors_precomp != nullptr ? colors_precomp : geomState.rgb;
 	const float* depth_ptr = geomState.depths;
-	CHECK_CUDA(FORWARD::render(
+	CHECK_CUDA(FORWARD::render_sample(
 		tile_grid, block,
 		imgState.ranges,
 		binningState.point_list,
-		width, height,
+		width, height, accum_step,
 		geomState.means2D,
 		feature_ptr,
 		depth_ptr,
@@ -826,7 +604,8 @@ int CudaRasterizer::Rasterizer::forward_sample_test(
 		out_color,
 		out_point_id,
 		out_point_weight_pixel,
-		out_point_weight
+		out_point_weight,
+		pixel_accum
 	), debug)
 
 	return num_rendered;

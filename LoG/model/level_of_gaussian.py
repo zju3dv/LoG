@@ -399,8 +399,8 @@ class LoG(nn.Module):
         self.lr = self.optimizer.xyz_lr
         if self.optimizer.global_steps == self.base_iter:
             print(f'[{self.__class__.__name__}] base iteration {self.base_iter} done, enable view_correction module')
-        if self.use_view_correction and self.optimizer.global_steps > self.base_iter:
-            self.view_correction.step()
+        # if self.use_view_correction and self.optimizer.global_steps > self.base_iter:
+        #     self.view_correction.step()
 
     def update_init_stage(self, scale=1):
         flag_remove_weight = self.counter.weights_max < self.densify_and_remove.init_weight_min

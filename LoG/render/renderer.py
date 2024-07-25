@@ -301,8 +301,8 @@ class NaiveRendererAndLoss(BaseRender):
         ret = rasterizer(**name_args)
         # ret = rasterizer()
         # radii ?  这里的point_id_pixel出现了重复
-        if len(ret)== 8:
-            rendered_image, radii, point_id_pixel, point_weight_pixel, point_weight, range_size, ranges ,primitive_index= ret
+        if len(ret)== 9:
+            rendered_image,  point_id_pixel, point_weight_pixel, point_weight,radii, range_size, ranges ,primitive_index, alpha_accumulation= ret
 
             point_id, point_count = torch.unique(point_id_pixel, sorted=True, return_counts=True)
             if point_id[0] == -1:
@@ -328,7 +328,8 @@ class NaiveRendererAndLoss(BaseRender):
                 "opacity": opacity,
                 "range_size":range_size,
                 "primitive_index":primitive_index,
-                "ranges":ranges
+                "ranges":ranges,
+                'alpha_accumulation':alpha_accumulation
             }
         else: 
             rendered_image, radii, point_id_pixel, point_weight_pixel, point_weight = ret
