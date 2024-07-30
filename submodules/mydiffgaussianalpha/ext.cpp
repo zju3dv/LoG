@@ -14,6 +14,7 @@
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("compute_radius", &compute_radius);
+  m.def("compute_radius_focal",&compute_radius_focal);
   m.def("rasterize_gaussians", &RasterizeGaussiansCUDA);
   m.def("rasterize_gaussians_backward", &RasterizeGaussiansBackwardCUDA);
   m.def("mark_visible", &markVisible);

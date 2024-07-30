@@ -17,6 +17,8 @@ from easyvolcap.utils.viewer_utils import Camera, CameraPath, visualize_cameras,
 from easyvolcap.engine import cfg
 from easyvolcap.utils.data_utils import load_image
 
+import cv2
+
 import glfw
 from easyvolcap.runners.volumetric_video_viewer import VolumetricVideoViewer
 
@@ -25,7 +27,7 @@ class Viewer(VolumetricVideoViewer):
                  window_size = [1080, 1920],  # height, width
                  window_title: str = f'LoG',  # MARK: global config
                  exp_name: str = 'random',
-                 font_size: int = 64,
+                 font_size: int = 32,
                  font_bold: str = 'submodules/EasyVolcap/assets/fonts/CascadiaCodePL-Bold.otf',
                  font_italic: str = 'submodules/EasyVolcap/assets/fonts/CascadiaCodePL-Italic.otf',
                  font_default: str = 'submodules/EasyVolcap/assets/fonts/CascadiaCodePL-Regular.otf',
@@ -50,9 +52,6 @@ class Viewer(VolumetricVideoViewer):
 
                  fullscreen: bool = False,
                  camera_cfg: dotdict = dotdict(type=Camera.__name__, string='{"H":2032,"W":3840,"K":[[4279.6650390625,0.0,1920.0],[0.0,4279.6650390625,992.4420776367188],[0.0,0.0,1.0]],"R":[[0.41155678033828735,0.911384105682373,0.0],[-0.8666263818740845,0.39134538173675537,0.3095237910747528],[0.2820950746536255,-0.12738661468029022,0.9508903622627258]],"T":[[-4.033830642700195],[-1.7978200912475586],[3.9347341060638428]],"n":0.10000000149011612,"f":1000.0,"t":0.0,"v":0.0,"bounds":[[-10.0,-10.0,-3.0],[10.0,10.0,4.0]],"mass":0.10000000149011612,"moment_of_inertia":0.10000000149011612,"movement_force":1.0,"movement_torque":1.0,"movement_speed":5.0,"origin":[0.0,0.0,0.0],"world_up":[0.0,0.0,-1.0]}'),
-
-                 
-                 
 
                  show_metrics_window: bool = False,
                  show_demo_window: bool = False,
@@ -90,7 +89,7 @@ class Viewer(VolumetricVideoViewer):
 
         self.init_camera(camera_cfg)  # prepare for the actual rendering now, needs dataset -> needs runner
         self.init_glfw()  # ?: this will open up the window and let the user wait, should we move this up?
-        self.init_imgui()
+        self.init_imgui() # initialize the menu
 
         from easyvolcap.engine import args
         args.type = 'gui'  # manually setting this parameter
@@ -133,6 +132,7 @@ class Viewer(VolumetricVideoViewer):
         self.camera = Camera(**camera_cfg)
         self.camera.front = self.camera.front  # perform alignment correction
 
+    # 这里是核心的渲染
     def frame(self):
         # print(f'framing: {time.perf_counter()}')
         import OpenGL.GL as gl
@@ -157,8 +157,13 @@ class Viewer(VolumetricVideoViewer):
             for mesh in self.meshes:
                 mesh.render(self.camera)
 
-        self.draw_imgui()  # defines GUI elements
+        self.draw_imgui()  # defines GUI elements v#在这里捕捉到外参内参的变化
         self.show_imgui()
+
+        # use foreground mask
+        import os
+        render_name = os.path.join('output/Yingrenshi_add_path/log', 'renders', '%04d.png'%(1))
+        cv2.imwrite(render_name, image.cpu().clone().numpy())
 
     def draw_rendering_gui(self, batch: dotdict = dotdict(), output: dotdict = dotdict()):
 

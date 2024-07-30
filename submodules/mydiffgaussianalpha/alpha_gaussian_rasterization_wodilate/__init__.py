@@ -402,3 +402,7 @@ class GaussianSampler(nn.Module):
             raster_settings, 
             use_filter
         )
+    
+def compute_radius_focal(means3D,scales,rotations,projmatrix,viewmatrix,focal_x,focal_y,tan_fovx,tan_fovy):
+    args=(means3D,scales,rotations,projmatrix,viewmatrix,focal_x,focal_y,tan_fovx,tan_fovy)
+    return _C.compute_radius_focal(*args)

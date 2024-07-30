@@ -8,7 +8,7 @@ from .counter import Counter
 from .splitter import Splitter
 from .tensor_tree import TensorTree
 from .model_utils import get_module_by_str
-from ..cuda.compute_radius import compute_radius_module
+from alpha_gaussian_rasterization_wodilate import compute_radius_focal
 from .corrector import Corrector
 
 MIN_PIXEL = 3
@@ -79,7 +79,7 @@ class Gaussian(nn.Module):
             image_height = camera.raster_settings.image_height
             focal_x = image_width / (2.0 * tanfovx)
             focal_y = image_height / (2.0 * tanfovy)
-            radius2d_cuda = compute_radius_module.compute_radius(
+            radius2d_cuda = compute_radius_focal(
                 xyz, scaling, rotation, 
                 proj_matrix, view_matrix,
                 focal_x, focal_y, tanfovx, tanfovy)

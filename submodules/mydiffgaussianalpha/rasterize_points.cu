@@ -245,6 +245,39 @@ torch::Tensor compute_radius(
 	return radii;
 }
 
+torch::Tensor compute_radius_focal(
+	torch::Tensor& means3D,
+	torch::Tensor& scales,
+	torch::Tensor& rotations,
+	torch::Tensor& projmatrix,
+	torch::Tensor& viewmatrix,
+    float focal_x, float focal_y,
+    float tan_fovx, float tan_fovy
+)
+{ 
+	const int P = means3D.size(0);
+	const int H = focal_y * (2.0f * tan_fovy);
+	const int W = focal_x * (2.0f * tan_fovx);
+  
+	torch::Tensor radii = torch::full({P}, 0, means3D.options());
+	if(P != 0)
+	{
+		int M = 0;
+		FORWARD::compute_radius(
+			P,
+			H, W,
+			means3D.contiguous().data<float>(),
+			scales.contiguous().data_ptr<float>(),
+			rotations.contiguous().data_ptr<float>(),
+			viewmatrix.contiguous().data<float>(), 
+			projmatrix.contiguous().data<float>(),
+			tan_fovx,
+			tan_fovy,
+			radii.contiguous().data<float>());
+	}
+	return radii;
+}
+
 torch::Tensor markVisible(
 	torch::Tensor &means3D,
 	torch::Tensor &viewmatrix,

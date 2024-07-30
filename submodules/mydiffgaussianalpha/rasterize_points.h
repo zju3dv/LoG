@@ -101,3 +101,13 @@ torch::Tensor compute_radius(
 		const int image_height,
 		const int image_width
 		);
+
+torch::Tensor compute_radius_focal(
+	torch::Tensor& means3D,
+	torch::Tensor& scales,
+	torch::Tensor& rotations,
+	torch::Tensor& projmatrix,
+	torch::Tensor& viewmatrix,
+    float focal_x, float focal_y,
+    float tan_fovx, float tan_fovy
+);

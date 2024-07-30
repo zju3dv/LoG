@@ -90,7 +90,6 @@ def common_opengl_options():
     gl.glDepthFunc(gl.GL_LEQUAL)
     # gl.glDepthRange(-1.0, 1.0)
     gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
-
     # Enable some masking tests
     gl.glEnable(gl.GL_SCISSOR_TEST)
 
