@@ -30,6 +30,7 @@ from easyvolcap.utils.timer_utils import timer
 from easyvolcap.utils.data_utils import add_iter, add_batch, to_cuda, Visualization
 
 
+
 @RUNNERS.register_module()
 class WebSocketServer:
     # Viewer should be used in conjuction with another runner, which explicitly handles model loading

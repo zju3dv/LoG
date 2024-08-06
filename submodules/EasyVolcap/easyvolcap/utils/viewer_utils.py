@@ -279,7 +279,7 @@ class CameraPath:
         # Store keyframes to path
         cameras = {f'{i:06d}': k.to_easymocap() for i, k in enumerate(self.keyframes)}
         write_camera(cameras, path)  # without extri.yml, only dirname
-        log(yellow(f'Keyframes saved to: {blue(path)}'))
+        # log(yellow(f'Keyframes saved to: {blue(path)}'))
 
     def load_keyframes(self, path: str):
         # Store keyframes to path

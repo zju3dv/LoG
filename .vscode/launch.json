@@ -5,6 +5,8 @@
     "version": "0.2.0",
     "configurations": [
         
+
+        
         {
             "name": "Python Debugger: gui",
             "type": "python",
@@ -29,9 +31,9 @@
             "console": "integratedTerminal",
             "justMyCode": true,
              //环境名对应的python路径
-            "python": "/root/miniconda3/envs/log/bin/python",
+            "python": "C:/Users/Admin/miniconda3/envs/log/python.exe",
             "args":[
-                "--cfg","/root/repository/project/sci/log/LoG/config/Yingrenshi_add_path/train.yml",
+                "--cfg","config/Yingrenshi_add_path/train.yml",
                 "split","renderability",
                 "ckptname","output/Yingrenshi_add_path/log/model_latest.pth",
                 

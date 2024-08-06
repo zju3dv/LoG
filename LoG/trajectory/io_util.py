@@ -6,6 +6,9 @@ import numpy as np
 import pkg_resources
 # from easyvolcap.utils.console_utils import *
 
+from LoG.trajectory.base_util import dotdict
+
+from os.path import join, exists, dirname
 
 class FileStorage(object):
     def __init__(self, filename, isWrite=False):

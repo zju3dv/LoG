@@ -1,6 +1,6 @@
 import xml.dom.minidom as minidom
 import os
-from LoG.trajectory.utils import cal_distance_GPS
+from LoG.trajectory.gps_util import cal_distance_GPS
 
 class GPS_Position:
     def __init__(self, lat, lon, alt):

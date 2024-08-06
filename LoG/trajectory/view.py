@@ -498,8 +498,20 @@ class Camera:
         camera = to_numpy(batch)
         return camera
 
+    def to_numpy(self):
+        batch = self.to_batch()
+        camera = to_numpy(batch)
+        return camera
     def from_easymocap(self, camera: dict):
         batch = to_tensor(camera)
+        self.from_batch(batch)
+        return self
+    
+    def from_tuple(self,camera: tuple):
+        # 这里的tuple参考 from batch的方法，保持一样的结构
+        key_list=["H","W","K","R","T","n","f","t","v","bounds"]
+        camera_dict=dict(zip(key_list,camera))
+        batch = to_tensor(camera_dict)
         self.from_batch(batch)
         return self
 

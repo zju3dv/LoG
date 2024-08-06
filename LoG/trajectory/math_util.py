@@ -18,3 +18,9 @@ def affine_padding(c2w: torch.Tensor):
     pad = torch.cat([pad0, pad1], dim=-1)  # B, 1, 4
     c2w = torch.cat([c2w, pad], dim=-2)  # B, 4, 4
     return c2w
+
+def affine_inverse(A: torch.Tensor):
+    R = A[..., :3, :3]  # ..., 3, 3
+    T = A[..., :3, 3:]  # ..., 3, 1
+    P = A[..., 3:, :]  # ..., 1, 4
+    return torch.cat([torch.cat([R.mT, -R.mT @ T], dim=-1), P], dim=-2)

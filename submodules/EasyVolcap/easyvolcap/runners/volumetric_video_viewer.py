@@ -852,6 +852,221 @@ class VolumetricVideoViewer:
         if self.visualize_paths:
             self.camera_path.draw(self.camera)  # do the projection
 
+    def draw_trajectory_gui(self, batch: dotdict = dotdict(), output: dotdict = dotdict()):
+        # 目前实现目标
+        # 1. 添加控制点
+        # 2. 生成采樣結果
+        # 3. 生成渲染結果
+        # 4. 輸出視角信息
+        # 5. 清空trajectory
+
+        # Export animation (camera paths)
+        # imgui.set_next_item_open(True)
+        if imgui.collapsing_header(f'Trajectory', ):
+
+            push_button_color(0x55cc33ff)
+            if imgui.button('Insert'):
+                self.trajectory.insert(self.camera)
+            pop_button_color()
+
+            if len(self.trajectory):  # if exists, can delete or replace
+                # Update the keyframes
+                # imgui.push_font(self.bold_font)
+                
+
+                #生成采樣結果
+                # push_button_color(0xff5533ff)
+                # if imgui.button('Replace'): self.camera_path.replace(self.camera)
+                # pop_button_color()
+
+                #生成渲染結果
+                # Update the keyframes
+                imgui.same_line()
+                push_button_color(0xff3355ff)
+                if imgui.button('Render'): self.save_render_images()
+                pop_button_color()
+
+                # 保存视角信息
+                imgui.same_line()
+                push_button_color(0xff3355ff)
+                if imgui.button('Save_views'): self.save_views()
+                pop_button_color()
+
+                # 清空trajectory
+                imgui.same_line()
+                push_button_color(0xff3355ff)
+                if imgui.button('Clear'): self.trajectory.clear()
+                pop_button_color()
+
+                # 清空trajectory
+                imgui.same_line()
+                push_button_color(0xff3355ff)
+                if imgui.button('Interp'): self.interp()
+                pop_button_color()
+
+                imgui.text(f'Current control points : {len(self.trajectory)}')
+
+
+        #     # push_button_color(0xff5533ff)
+        #     if imgui.button('Load'):
+        #         self.static.load_keyframes_dialog = pfd.select_folder("Select folder")
+        #     # pop_button_color()
+        #     if 'load_keyframes_dialog' in self.static and \
+        #             self.static.load_keyframes_dialog is not None and \
+        #             self.static.load_keyframes_dialog.ready(timeout=1):  # this is not moved up since it spans frames # MARK: SLOW
+        #         directory = self.static.load_keyframes_dialog.result()
+        #         if directory:
+        #             self.camera_path.load_keyframes(directory)
+        #             self.static.keyframes_path = directory
+        #         self.static.load_keyframes_dialog = None
+
+        #     # Timelines
+        #     if len(self.camera_path):  # need at least 3 components to interpolate
+        #         imgui.same_line()
+        #         if imgui.button('Export keyframes'):
+        #             self.static.export_keyframes_dialog = pfd.select_folder("Select folder")
+        #         if 'export_keyframes_dialog' in self.static and \
+        #                 self.static.export_keyframes_dialog is not None and \
+        #                 self.static.export_keyframes_dialog.ready(timeout=1):  # this is not moved up since it spans frames # MARK: SLOW
+        #             directory = self.static.export_keyframes_dialog.result()
+        #             if directory:
+        #                 self.camera_path.export_keyframes(directory)
+        #                 self.static.keyframes_path = directory
+        #             self.static.export_keyframes_dialog = None
+
+        #         imgui.same_line()
+        #         if imgui.button('Export interpolated'):
+        #             self.static.export_interp_dialog = pfd.select_folder("Select folder")
+        #         if 'export_interp_dialog' in self.static and \
+        #                 self.static.export_interp_dialog is not None and \
+        #                 self.static.export_interp_dialog.ready(timeout=1):  # this is not moved up since it spans frames # MARK: SLOW
+        #             directory = self.static.export_interp_dialog.result()
+        #             if directory:
+        #                 self.camera_path.export_interps(directory)
+        #                 self.static.keyframes_path = directory
+        #             self.static.export_interp_dialog = None
+
+        #         self.camera_path.n_render_views = imgui.slider_int('N Interps', self.camera_path.n_render_views, 100, 10000)[1]  # temporal interpolation
+
+        #     if len(self.camera_path):  # if exists, can delete or replace
+        #         imgui.text('Timeline control')
+        #         space = (len(self.camera_path) - 1) / len(self.camera_path)  # to fill them up
+        #         width = self.static.slider_width / len(self.camera_path) - space
+        #         for i in range(len(self.camera_path)):
+        #             if i != 0:
+        #                 imgui.same_line(0, 1)
+        #             sel = i == self.camera_path.selected  # might get updated during this
+        #             if sel:
+        #                 push_button_color(0x8855aaff)  #
+        #             if imgui.button(f'###{i}', ImVec2(width, 0)):
+        #                 self.camera_path.selected = i  # will not change playing_time after inserting the first keyframe
+        #                 self.static.playing_time = self.camera_path.playing_time  # Do not change playing time, instead load the stored camera, this variable controls wherther to interp
+        #                 self.camera = deepcopy(self.camera_path.keyframes[i])  # change the current camera
+        #             if sel:
+        #                 pop_button_color()
+
+        #     # Timelines
+        #     if len(self.camera_path) > 3:  # need at least 3 components to interpolate
+
+        #         # Player control
+        #         imgui.text('Player control')
+        #         if imgui.button(f'{"|<"}'):  # centered
+        #             self.camera_path.selected = 0
+        #         imgui.same_line()
+        #         if imgui.button(f'{"<"}'):
+        #             self.camera_path.selected = max(0, self.camera_path.selected - 1)
+
+        #         imgui.same_line()
+        #         push_button_color(0xff5533ff if self.camera_path.playing else 0x55cc33ff)
+        #         if imgui.button(f'{"Stop": ^4}' if self.camera_path.playing else f'{"Play": ^4}'):
+        #             self.camera_path.playing = not self.camera_path.playing
+        #         pop_button_color()
+
+        #         imgui.same_line()
+        #         if imgui.button(f'{">"}'):
+        #             self.camera_path.selected = min(len(self.camera_path) - 1, self.camera_path.selected + 1)
+
+        #         imgui.same_line()
+        #         if imgui.button(f'{">|"}'):
+        #             self.camera_path.selected = len(self.camera_path) - 1
+
+        #         # if self.camera_path.playing:
+        #         imgui.same_line()
+        #         self.camera_path.playing_speed = imgui.slider_float('Speed', self.camera_path.playing_speed, 0.0001, 0.005, format='%.6f')[1]  # temporal interpolation
+
+        #         # Timeline slider
+        #         self.camera_path.playing_time = imgui.slider_float('Playing time', self.camera_path.playing_time, 0, 1)[1]  # temporal interpolation
+        #         self.camera_path.loop_interp = imgui_toggle.toggle('Loop interpolations', self.camera_path.loop_interp, config=self.static.toggle_ios_style)[1]
+        #         self.visualize_paths = imgui_toggle.toggle('Visualize paths', self.visualize_paths, config=self.static.toggle_ios_style)[1]
+
+        #         if 'keyframes_path' in self.static:
+        #             offline_title = 'Keyframes offline rendering script:'
+        #             imgui.text(offline_title)
+        #             backslash, slash = '\\', '/'  # windows supports both forward and backward slash
+        #             args = sys.argv
+        #             args[0] = os.path.basename(args[0])  # hope this can be called at whereever place
+        #             source = f"{' '.join(args)}".replace('gui', 'test')
+        #             source += " " + f"val_dataloader_cfg.dataset_cfg.camera_path_intri={join(self.static.keyframes_path, 'intri.yml').replace(backslash, slash)}"
+        #             source += " " + f"val_dataloader_cfg.dataset_cfg.camera_path_extri={join(self.static.keyframes_path, 'extri.yml').replace(backslash, slash)}"
+        #             source += " " + f"val_dataloader_cfg.dataset_cfg.temporal_range=None"
+        #             source += " " + f"configs=configs/specs/cubic.yaml,configs/specs/ibr.yaml,configs/specs/cubic.yaml,configs/specs/interp.yaml" if 'ImageBased' in self.dataset.__class__.__name__ else " " + f"configs=configs/specs/interp.yaml"
+        #             source += " " + f"val_dataloader_cfg.dataset_cfg.interp_cfg.smoothing_term=0.0" if self.camera_path.loop_interp else " " + f"val_dataloader_cfg.dataset_cfg.interp_cfg.smoothing_term=10.0"
+
+        #             if 'editor' not in self.static:
+        #                 editor = ed.TextEditor()
+        #                 editor.set_language_definition(ed.TextEditor.LanguageDefinition.python())
+        #                 editor.set_read_only(True)
+        #                 editor.set_show_whitespaces(True)
+        #                 self.static.editor = editor
+
+        #             line_height = imgui.get_font_size()
+        #             editor_size = ImVec2()
+        #             editor_size.x = (imgui.get_content_region_max().x - imgui.get_window_content_region_min().x - imgui.get_style().item_spacing.x)
+        #             editor_size.y = line_height * (len(source.split('\n')) + 1.5)
+
+        #             if (imgui.button('Copy')):
+        #                 imgui.set_clipboard_text(source)
+
+        #             imgui.same_line()
+        #             self.static.editor.set_text(source)
+        #             self.static.editor.render(a_title='Code', a_size=editor_size, a_border=False)  # id, size, border
+
+        #             if 'offline' in self.static and self.static.offline is not None:  # exists and started
+        #                 if self.static.offline.poll() is None:
+        #                     # Still running
+        #                     push_button_color(0xff3355ff)
+        #                     if (imgui.button('Kill offline rendering')):
+        #                         self.static.offline.kill()
+        #                     pop_button_color()
+        #                     imgui.text(f'Offline rendering running... (PID: {self.static.offline.pid})')
+        #                     imgui.text(f'Please check the terminal output for details')
+        #                 else:
+        #                     # Finished
+        #                     self.static.offline = None
+        #             else:
+        #                 if (imgui.button('Run offline rendering')):
+        #                     self.static.offline = subprocess.Popen(source.split(' '))
+
+        # if self.camera_path.playing:  # automatic update of playing time
+        #     self.camera_path.playing_time = (self.camera_path.playing_time + self.camera_path.playing_speed) % 1
+
+        # if self.camera_path.playing_time != self.static.playing_time and len(self.camera_path) > 3:  # ok to interpolate
+        #     # Update main camera
+        #     us = self.camera_path.playing_time
+        #     interp = self.camera_path.interp(us)
+        #     if interp is not None:
+        #         H, W, K, R, T, n, f, t, v, bounds = interp
+        #         interp = dotdict(H=H, W=W, K=K, R=R, T=T, n=n, f=f, t=t, v=v, bounds=bounds)
+        #         self.camera.from_batch(interp)  # may return None
+
+        #     # Update cursor when dragging the slider
+        #     K = len(self.camera_path)
+        #     self.camera_path.cursor_index = min(int(np.floor(us * (K - 1))), K - 1)  # do not interp or change playtime
+
+        # # Render user added camera path
+        # if self.visualize_paths:
+        #     self.camera_path.draw(self.camera)  # do the projection
+
     def draw_mesh_gui(self, batch: dotdict = dotdict(), output: dotdict = dotdict()):
         from easyvolcap.utils.gl_utils import Mesh, Splat, Gaussian, PointSplat
 
@@ -1505,3 +1720,5 @@ class VolumetricVideoViewer:
 
         self.window = window
         cfg.window = window  # MARK: GLOBAL VARIABLE
+
+    

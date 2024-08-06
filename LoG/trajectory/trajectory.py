@@ -8,6 +8,7 @@ import glm
 import torch
 import numpy as np
 from typing import List, Optional
+from tqdm import tqdm
 
 from os.path import join
 from scipy import interpolate
@@ -15,9 +16,14 @@ from copy import copy, deepcopy
 
 from glm import vec2, vec3, vec4, mat3, mat4, mat4x3, mat2x3  # This is actually highly optimized
 
-from .camera import Camera
+from .cam_util import gen_cubic_spline_interp_func, gen_linear_interp_func
+from .view import Camera
+from .io_util import read_camera,write_camera
+from .dotdict import dotdict
+from .math_util import affine_inverse
+from .data_util import to_tensor
 
-class CameraPath:
+class Trajectory:
     # This is the Model in the EVC gui designs
 
     # Basic a list of cameras with interpolations
@@ -76,6 +82,21 @@ class CameraPath:
 
     def __len__(self):
         return len(self.keyframes)
+    
+    def __iter__(self):
+        # 返回自身实例作为迭代器
+        self.index=0
+        return self
+
+    def __next__(self):
+        # 检查是否到达了列表的末尾
+        if self.index >= len(self.keyframes):
+            raise StopIteration
+        # 获取当前元素并递增索引
+        keyframe = self.keyframes[self.index]
+        self.index += 1
+        return keyframe
+
 
     @property
     def loop_interp(self):
@@ -159,7 +180,7 @@ class CameraPath:
         bounds = torch.as_tensor(lin[15:]).view(2, 3)  # no need for transpose
 
         # Extract splined parameters
-        w2c = affine_inverse(torch.as_tensor(c2w))  # already float32
+        w2c = affine_inverse(torch.as_tensor(c2w)) # already float32
         R = w2c[:3, :3]
         T = w2c[:3, 3:]
 
@@ -167,9 +188,9 @@ class CameraPath:
 
     def export_keyframes(self, path: str):
         # Store keyframes to path
-        cameras = {f'{i:06d}': k.to_easymocap() for i, k in enumerate(self.keyframes)}
+        cameras = {f'{i:06d}': to_tensor(k) for i, k in enumerate(self.keyframes)}
         write_camera(cameras, path)  # without extri.yml, only dirname
-        log(yellow(f'Keyframes saved to: {blue(path)}'))
+        # log(yellow(f'Keyframes saved to: {blue(path)}'))
 
     def load_keyframes(self, path: str):
         # Store keyframes to path
@@ -180,14 +201,29 @@ class CameraPath:
         self.update()
 
     def export_interps(self, path: str):
+        # 1. 进行interp 2. 保存内参外参 3. 输出trajectory 变量
         # Store interpolations (animation) to path
-        us = np.linspace(0, 1, self.n_render_views, dtype=np.float32)
+        us = np.linspace(0, 1, self.n_render_views*len(self.keyframes), dtype=np.float32)
 
-        cameras = dotdict()
+        interp_cameras = []
+        cameras=dotdict()
         for i, u in enumerate(tqdm(us, desc='Exporting interpolated cameras')):
-            cameras[f'{i:06d}'] = self.interp(u).to_easymocap()
+        # for i, u in enumerate(tqdm(us, desc='Exporting interpolated cameras')):
+            interp_camera=self.interp(u)
+            cam=Camera().from_tuple(interp_camera)
+            interp_cameras.append(cam)
+            cameras[f'{i:06d}'] = cam.to_easymocap()
         write_camera(cameras, path)  # without extri.yml, only dirname
-        log(yellow(f'Interpolated cameras saved to: {blue(path)}'))
+
+        interp_traj = Trajectory(playing=False)
+        interp_traj.keyframes=interp_cameras
+
+        return interp_traj
+
+        #在这里如果修改frams 则会使原有的frames分布错误
+        # self.keyframes=cameras
+        # self.export_keyframes(path)
+        # log(yellow(f'Interpolated cameras saved to: {blue(path)}'))
 
     def render_imgui(self, viewer: 'VolumetricVideoViewer', batch: dotdict):
         # from easyvolcap.utils.gl_utils import Mesh
@@ -257,6 +293,9 @@ class CameraPath:
                     continue
                 add_debug_line(proj, vec3(*p), vec3(*c), col=self.plot_color, thickness=self.plot_thickness)
                 p = c
+
+    
+
 
     def render(self, camera: Camera):
         pass

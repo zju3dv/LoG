@@ -19,6 +19,17 @@ def gen_cubic_spline_interp_func(c2ws: np.ndarray, smoothing_term=10.0, *args, *
         high = N - 1 + 4 - 2  # should remove last one segment, please just work...
         c2ws = np.concatenate([c2ws[-2:], c2ws, c2ws[:2]])
 
+    cs = interpolate.CubicSpline(np.linspace(0, 1, len(c2ws), dtype=np.float32), c2ws)
+
+    if smoothing_term == 0:
+        def pf(us): return cs((us * N - low) / (high - low))  # periodic function will call the linear function
+        f = pf  # periodic function
+    else:
+        f = cs  # linear function
+    return f
+
+
+
 
 def gen_linear_interp_func(lins: np.ndarray, smoothing_term=10.0):  # smoothing_term <= will loop the interpolation
     if smoothing_term == 0:

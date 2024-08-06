@@ -5,7 +5,7 @@ parents:
 
 
 exp: output/Yingrenshi_add_path/log
-gpus: [0]
+gui_exp: output/Yingrenshi_add_path/renderability
 
 log_interval: 1000
 save_interval: 50_000

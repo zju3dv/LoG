@@ -17,6 +17,10 @@ from easyvolcap.utils.viewer_utils import Camera, CameraPath, visualize_cameras,
 from easyvolcap.engine import cfg
 from easyvolcap.utils.data_utils import load_image
 
+from LoG.trajectory.trajectory import Trajectory
+
+from tqdm import tqdm
+
 import cv2
 
 import glfw
@@ -86,6 +90,11 @@ class Viewer(VolumetricVideoViewer):
 
         self.exposure = 1.0
         self.offset = 0.0
+
+        # trajectory
+        self.trajectory= Trajectory(playing=False)
+
+        
 
         self.init_camera(camera_cfg)  # prepare for the actual rendering now, needs dataset -> needs runner
         self.init_glfw()  # ?: this will open up the window and let the user wait, should we move this up?
@@ -160,10 +169,10 @@ class Viewer(VolumetricVideoViewer):
         self.draw_imgui()  # defines GUI elements v#在这里捕捉到外参内参的变化
         self.show_imgui()
 
-        # use foreground mask
-        import os
-        render_name = os.path.join('output/Yingrenshi_add_path/log', 'renders', '%04d.png'%(1))
-        cv2.imwrite(render_name, image.cpu().clone().numpy())
+        # # use foreground mask
+        # import os
+        # render_name = os.path.join('output/Yingrenshi_add_path/log', 'renders', '%04d.png'%(1))
+        # cv2.imwrite(render_name, image.cpu().clone().numpy())
 
     def draw_rendering_gui(self, batch: dotdict = dotdict(), output: dotdict = dotdict()):
 
@@ -201,13 +210,14 @@ class Viewer(VolumetricVideoViewer):
         imgui.begin(f'{self.W}x{self.H} {fps:.3f} fps###main', flags=imgui.WindowFlags_.menu_bar)
 
         self.draw_menu_gui()
-        self.draw_banner_gui()
-        self.draw_camera_gui()
-        self.draw_rendering_gui()
-        self.draw_keyframes_gui()
+        # self.draw_banner_gui()
+        # self.draw_camera_gui()
+        # self.draw_rendering_gui()
+        # self.draw_keyframes_gui()
+        self.draw_trajectory_gui()
         # self.draw_model_gui()
-        self.draw_mesh_gui()
-        self.draw_debug_gui()
+        # self.draw_mesh_gui()
+        # self.draw_debug_gui()
 
         # End of main window and rendering
         imgui.end()
@@ -301,6 +311,128 @@ class Viewer(VolumetricVideoViewer):
 
         self.window = window
         cfg.window = window  # MARK: GLOBAL VARIABLE
+
+
+    #以下為新增的功能
+    #1. 渲染並保存渲染結果
+    #2. 保存視角信息
+    #3. 單獨計算loss並輸出
+    #4. 生成軌跡
+
+    #1. 渲染並保存渲染結果
+    def save_render_images(self,trajectory=None,folder_name=None,file_path=None): 
+        def render_image_process(render_rst):
+            image=render_rst.permute(1, 2, 0).numpy()
+            image = (np.clip(image[:, :,::-1], 0., 1.) * 255).astype(np.uint8)
+            return image
+
+        if trajectory is None:
+            trajectory=self.trajectory
+
+        num_image=len(trajectory)
+        if(num_image==0):
+            log(red('No image to save'))
+            return
+        
+        # 设置输出地址
+        import os
+        from datetime import datetime
+        exp=self.model_cfg.gui_exp
+        if file_path:
+            save_path=file_path
+        else:
+            if folder_name:
+                save_path=os.path.join(exp, 'view_render',folder_name)
+            else:
+                save_path=os.path.join(exp, 'view_render',datetime.now().strftime('%Y%m%d%H%M'))
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+
+        # render_rsts=[]
+        with torch.no_grad():
+            # 尝试串行处理
+            for index,camera in tqdm(enumerate(trajectory),desc='Rendering interp images'):
+                batch=easyvolcap_camera_to_fastnb_camera(camera.to_batch())
+                output=self.renderer.vis(dotdict(camera=batch), self.model)['render'][0].cpu()
+                image=render_image_process(output)
+                
+                image_path = os.path.join(save_path, '%04d.png'%(index))
+                cv2.imwrite(image_path, image)
+        
+        return
+
+
+            # batchs=[easyvolcap_camera_to_fastnb_camera(camera.to_batch()) for camera in trajectory]
+            # output=[ self.renderer.vis(dotdict(camera=batch), self.model)['render'][0].cpu() for batch in tqdm(batchs, desc='Rendering interp images')]
+            # images=[render_image_process(render_rst) for render_rst in output]
+
+            # 把图像输出提前，保证内存不溢出
+
+        
+        # for index,image in tqdm(enumerate(images),desc='Saving render images'):
+            
+        #     image_path = os.path.join(save_path, '%04d.png'%(index))
+        #     cv2.imwrite(image_path, image)
+        # return images
+
+    #2. 保存視角信息
+    def save_views(self): 
+        import os
+        from datetime import datetime
+        exp=self.model_cfg.gui_exp
+        save_path=exp + '/views/'+datetime.now().strftime('%Y%m%d%H%M')
+        self.trajectory.export_keyframes(save_path)
+
+    #2. 保存視角信息
+    def interp(self): 
+        import os
+        from datetime import datetime
+        exp=self.model_cfg.gui_exp
+        save_path=exp + '/interp/'+datetime.now().strftime('%Y%m%d%H%M')
+        interp_traj=self.trajectory.export_interps(save_path)
+        self.save_render_images(trajectory=interp_traj,folder_name=save_path.split('/')[-1])
+        # self.save_video(render_images,video_name="interp_"+save_path.split('/')[-1])
+
+
+    def save_video(self,images,output_path=None,video_name=None,fps=30,video_type='.mp4'):
+        if not images:
+            raise ValueError("The list of arrays is empty")
+        
+        height, width, _ = images[0].shape
+        
+        import os
+        from datetime import datetime
+        exp=self.model_cfg.gui_exp
+        if output_path:
+            output_path=output_path+video_type
+        else:
+            if video_name:
+                output_path=os.path.join(exp, 'render_video',video_name+video_type)
+            else:
+                output_path=os.path.join(exp, 'render_video',datetime.now().strftime('%Y%m%d%H%M')+video_type)
+        if not os.path.exists(output_path):
+                os.makedirs(output_path)
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+        for frame in images:
+            # OpenCV expects images in [height, width, channels] format
+            
+            # Ensure the array is in the correct data type
+            frame = frame.astype(np.uint8)
+            
+            # OpenCV uses BGR color format, so convert from RGB if necessary
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            
+            # Write the frame
+            out.write(frame)
+    
+        # Release the VideoWriter
+        out.release()
+        print(f"Video saved to {output_path}")
+        
+
+        pass
 
 def easyvolcap_camera_to_fastnb_camera(batch: dotdict):
     K = batch.K
